@@ -8,7 +8,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8004',
+        target: 'https://civic-mind-ai-hw2i.onrender.com',
         changeOrigin: true,
         secure: false
       }
