@@ -1,16 +1,23 @@
-# React + Vite
+# CivicMind AI | Decision Intelligence Platform
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This is the CivicMind AI Decision Intelligence Platform, a live London Municipal Dashboard showing meteorological telemetry, transport statuses, and media feeds.
 
-Currently, two official plugins are available:
+## Tech Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+* **Frontend**: React + Vite + TailwindCSS + ECharts + Leaflet.js
+* **Backend**: FastAPI + Python Requests + XML RSS Parser
 
-## React Compiler
+## Running Locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Start the backend:
 
-## Expanding the Oxlint configuration
+   ```bash
+   cd backend
+   python -m uvicorn main:app --port 8002 --reload
+   ```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+2. Start the frontend:
+
+   ```bash
+   npm run dev
+   ```
