@@ -1,0 +1,40 @@
+# Render Blueprint Configuration (Infrastructure-as-Code)
+services:
+  # 1. FastAPI Python Backend Service
+  - type: web
+    name: civicmind-backend
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PORT
+        value: 8000
+
+  # 2. React Frontend Static Website
+  - type: web
+    name: civicmind-frontend
+    env: static
+    buildCommand: npm install && npm run build
+    publishPath: dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: max-age=31536000
+    routes:
+      # Rewrite all dynamic frontend path calls to index.html for client-side routing
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Tell static compiler where the API requests should be proxied to
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: civicmind-backend
+          property: host
