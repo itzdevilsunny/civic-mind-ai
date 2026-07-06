@@ -13,11 +13,14 @@ import xml.etree.ElementTree as ET
 
 
 # Load environment variables
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+import logging
+logger = logging.getLogger("uvicorn")
 
 # Try to initialize Supabase
 supabase_client = None
@@ -25,11 +28,11 @@ if SUPABASE_URL and SUPABASE_KEY and "your-supabase" not in SUPABASE_URL:
     try:
         from supabase import create_client
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("Connected to live Supabase database.")
+        logger.info("Connected to live Supabase database.")
     except Exception as e:
-        print(f"Failed to connect to Supabase: {e}. Running in Mock mode.")
+        logger.error(f"Failed to connect to Supabase: {e}. Running in Mock mode.", exc_info=True)
 else:
-    print("Supabase credentials not configured. Running in Mock database mode.")
+    logger.warning("Supabase credentials not configured. Running in Mock database mode.")
 
 # Try to initialize Gemini Generative AI
 gemini_available = False
@@ -38,11 +41,11 @@ if GEMINI_API_KEY and "your-google-gemini" not in GEMINI_API_KEY:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
         gemini_available = True
-        print("Gemini generative AI SDK initialized successfully.")
+        logger.info("Gemini generative AI SDK initialized successfully.")
     except Exception as e:
-        print(f"Failed to initialize Gemini SDK: {e}. Running in Mock AI mode.")
+        logger.error(f"Failed to initialize Gemini SDK: {e}. Running in Mock AI mode.", exc_info=True)
 else:
-    print("Gemini API key not configured. Running in Mock AI mode.")
+    logger.warning("Gemini API key not configured. Running in Mock AI mode.")
 
 app = FastAPI(title="CivicMind AI Backend", description="Decision Intelligence API Layer")
 
