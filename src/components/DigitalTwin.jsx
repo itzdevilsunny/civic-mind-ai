@@ -135,6 +135,14 @@ export default function DigitalTwin({ onSelectNode, activeIncident }) {
     setActiveLayers(prev => ({ ...prev, [layer]: !prev[layer] }));
   };
 
+  const handleDispatch = (node) => {
+    setNodes(prev => prev.map(n => n.id === node.id ? { ...n, status: 'Resolving', color: '#f59e0b', metric: `${n.name} - Dispatch deployed` } : n));
+    setSelectedNode(prev => ({ ...prev, status: 'Resolving', color: '#f59e0b', metric: `${prev.name} - Dispatch deployed` }));
+    if (onSelectNode) {
+      onSelectNode({ ...node, action: 'dispatch' });
+    }
+  };
+
   const getIcon = (type) => {
     switch (type) {
       case 'camera': return <Camera className="w-4 h-4 text-indigo-500" />;
@@ -195,11 +203,24 @@ export default function DigitalTwin({ onSelectNode, activeIncident }) {
               <span className={`font-bold px-1.5 py-0.5 rounded-full text-[10px] ${
                 selectedNode.status === 'Active' || selectedNode.status === 'Good' || selectedNode.status === 'Flowing' || selectedNode.status === 'Normal'
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+                  : selectedNode.status === 'Resolving'
+                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
                   : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-450'
               }`}>
                 {selectedNode.status}
               </span>
             </div>
+
+            {['Congested', 'Critical', 'Active'].includes(selectedNode.status) && (
+              <button
+                onClick={() => handleDispatch(selectedNode)}
+                className="btn-3d btn-primary text-xs w-full mt-3 flex items-center justify-center gap-1.5"
+                style={{ padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+              >
+                <Activity className="w-3.5 h-3.5 animate-pulse" />
+                <span>Dispatch Resolution Team</span>
+              </button>
+            )}
           </div>
         )}
 

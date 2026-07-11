@@ -359,7 +359,14 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 min-h-[400px]">
                   <DigitalTwin 
-                    onSelectNode={(node) => setSystemLogs(prev => [`Selected map telemetry: ${node.name}`, ...prev])} 
+                    onSelectNode={(node) => {
+                      if (node.action === 'dispatch') {
+                        setSystemLogs(prev => [`[Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
+                        confetti({ particleCount: 80, spread: 60 });
+                      } else {
+                        setSystemLogs(prev => [`Selected map telemetry: ${node.name}`, ...prev]);
+                      }
+                    }}
                     activeIncident={activeIncident}
                   />
                 </div>
@@ -520,7 +527,14 @@ export default function App() {
             <div className="flex flex-col gap-6">
               <div className="h-[450px]">
                 <DigitalTwin 
-                  onSelectNode={(node) => setSystemLogs(prev => [`Selected traffic node: ${node.name}`, ...prev])} 
+                  onSelectNode={(node) => {
+                    if (node.action === 'dispatch') {
+                      setSystemLogs(prev => [`[Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
+                      confetti({ particleCount: 80, spread: 60 });
+                    } else {
+                      setSystemLogs(prev => [`Selected traffic node: ${node.name}`, ...prev]);
+                    }
+                  }}
                   activeIncident={activeIncident}
                 />
               </div>
