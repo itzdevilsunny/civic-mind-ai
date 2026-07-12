@@ -1029,10 +1029,9 @@ def get_live_news(city: str = "Mumbai"):
     CITY_CHANNELS = {
         # ── MAHARASHTRA ──────────────────────────────────────────────────────
         "mumbai": {
-            "channel": "Hindustan Times — Mumbai",
+            "channel": "Hindustan Times — Mumbai News",
             "channel_url": "https://www.hindustantimes.com/mumbai-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/mumbai-news/rssfeed.xml", "Hindustan Times Mumbai"),
                 ("https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms", "Times of India Mumbai"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
@@ -1041,64 +1040,93 @@ def get_live_news(city: str = "Mumbai"):
             "channel": "Hindustan Times — Pune",
             "channel_url": "https://www.hindustantimes.com/cities/pune-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/pune-news/rssfeed.xml", "Hindustan Times Pune"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/-2128824718.cms", "Times of India Pune"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Pune"),
             ],
         },
         "nagpur": {
-            "channel": "Hindustan Times — Nagpur",
+            "channel": "Hindustan Times — Nagpur News",
             "channel_url": "https://www.hindustantimes.com/cities/nagpur-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/mumbai-news/rssfeed.xml", "Hindustan Times Maharashtra"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Maharashtra"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+            ],
+        },
+        "nashik": {
+            "channel": "Times of India — Nashik",
+            "channel_url": "https://timesofindia.indiatimes.com/city/nashik",
+            "feeds": [
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Maharashtra"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+            ],
+        },
+        "aurangabad": {
+            "channel": "Lokmat — Sambhajinagar News",
+            "channel_url": "https://www.lokmat.com/aurangabad/",
+            "feeds": [
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Maharashtra"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
             ],
         },
         # ── DELHI / NCR ───────────────────────────────────────────────────────
         "delhi": {
-            "channel": "Hindustan Times — Delhi",
-            "channel_url": "https://www.hindustantimes.com/delhi-news",
+            "channel": "Dainik Jagran — Delhi News",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/delhi-news-hindi.html",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/delhi-news/rssfeed.xml", "Hindustan Times Delhi"),
-                ("https://www.jagran.com/rss/news-delhi.xml", "Dainik Jagran Delhi"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India Delhi"),
+                ("https://www.amarujala.com/rss/breaking-news.xml", "Amar Ujala Delhi"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
             ],
         },
         "new-delhi": {
-            "channel": "Hindustan Times — Delhi",
+            "channel": "Hindustan Times — Delhi News",
             "channel_url": "https://www.hindustantimes.com/delhi-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/delhi-news/rssfeed.xml", "Hindustan Times Delhi"),
-                ("https://www.jagran.com/rss/news-delhi.xml", "Dainik Jagran Delhi"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India Delhi"),
+                ("https://www.amarujala.com/rss/breaking-news.xml", "Amar Ujala Delhi"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
             ],
         },
         "newdelhi": {
-            "channel": "Hindustan Times — Delhi",
+            "channel": "Hindustan Times — Delhi News",
             "channel_url": "https://www.hindustantimes.com/delhi-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/delhi-news/rssfeed.xml", "Hindustan Times Delhi"),
-                ("https://www.jagran.com/rss/news-delhi.xml", "Dainik Jagran Delhi"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India Delhi"),
+                ("https://www.amarujala.com/rss/breaking-news.xml", "Amar Ujala Delhi"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
             ],
         },
         "noida": {
-            "channel": "Dainik Jagran — NCR",
-            "channel_url": "https://www.jagran.com/cities/noida.html",
+            "channel": "Dainik Jagran — Noida",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/noida-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-national.xml", "Dainik Jagran"),
-                ("https://www.hindustantimes.com/feeds/rss/delhi-news/rssfeed.xml", "Hindustan Times NCR"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India NCR"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
             ],
         },
         "gurgaon": {
             "channel": "Hindustan Times — Gurugram",
-            "channel_url": "https://www.hindustantimes.com/gurugram",
+            "channel_url": "https://www.hindustantimes.com/cities/gurugram-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/delhi-news/rssfeed.xml", "Hindustan Times Delhi/NCR"),
-                ("https://www.jagran.com/rss/news-national.xml", "Dainik Jagran"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India NCR"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
+            ],
+        },
+        "ghaziabad": {
+            "channel": "Dainik Jagran — Ghaziabad",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/ghaziabad-news-hindi.html",
+            "feeds": [
+                ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India NCR"),
+            ],
+        },
+        "faridabad": {
+            "channel": "Hindustan Times — Faridabad",
+            "channel_url": "https://www.hindustantimes.com/cities/faridabad-news",
+            "feeds": [
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India NCR"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
             ],
         },
         # ── KARNATAKA ──────────────────────────────────────────────────────────
@@ -1108,7 +1136,7 @@ def get_live_news(city: str = "Mumbai"):
             "feeds": [
                 ("https://www.thehindu.com/news/cities/bangalore/?service=rss", "The Hindu Bengaluru"),
                 ("https://timesofindia.indiatimes.com/rssfeeds/-2128821153.cms", "Times of India Bangalore"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Bangalore"),
             ],
         },
         "bangalore": {
@@ -1117,7 +1145,22 @@ def get_live_news(city: str = "Mumbai"):
             "feeds": [
                 ("https://www.thehindu.com/news/cities/bangalore/?service=rss", "The Hindu Bengaluru"),
                 ("https://timesofindia.indiatimes.com/rssfeeds/-2128821153.cms", "Times of India Bangalore"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+            ],
+        },
+        "mysuru": {
+            "channel": "The Hindu — Mysuru",
+            "channel_url": "https://www.thehindu.com/news/cities/mysuru/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/bangalore/?service=rss", "The Hindu Karnataka"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Karnataka"),
+            ],
+        },
+        "hubli": {
+            "channel": "The Hindu — Hubli",
+            "channel_url": "https://www.thehindu.com/news/cities/Hubli/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/bangalore/?service=rss", "The Hindu Karnataka"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Karnataka"),
             ],
         },
         # ── TAMIL NADU ─────────────────────────────────────────────────────────
@@ -1126,8 +1169,7 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.thehindu.com/news/cities/chennai/",
             "feeds": [
                 ("https://www.thehindu.com/news/cities/chennai/?service=rss", "The Hindu Chennai"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/-2128818977.cms", "Times of India Chennai"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Chennai"),
             ],
         },
         "coimbatore": {
@@ -1135,16 +1177,29 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.thehindu.com/news/cities/coimbatore/",
             "feeds": [
                 ("https://www.thehindu.com/news/cities/coimbatore/?service=rss", "The Hindu Coimbatore"),
-                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.thehindu.com/news/cities/chennai/?service=rss", "The Hindu Tamil Nadu"),
             ],
         },
         "madurai": {
             "channel": "The Hindu — Madurai",
             "channel_url": "https://www.thehindu.com/news/cities/",
             "feeds": [
-                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.thehindu.com/news/cities/chennai/?service=rss", "The Hindu Tamil Nadu"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Tamil Nadu"),
+            ],
+        },
+        "salem": {
+            "channel": "The Hindu — Salem",
+            "channel_url": "https://www.thehindu.com/news/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/chennai/?service=rss", "The Hindu Tamil Nadu"),
+            ],
+        },
+        "tiruchirappalli": {
+            "channel": "The Hindu — Trichy",
+            "channel_url": "https://www.thehindu.com/news/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/chennai/?service=rss", "The Hindu Tamil Nadu"),
             ],
         },
         # ── ANDHRA / TELANGANA ─────────────────────────────────────────────────
@@ -1153,8 +1208,7 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.deccanchronicle.com/nation/current-affairs",
             "feeds": [
                 ("https://www.thehindu.com/news/cities/Hyderabad/?service=rss", "The Hindu Hyderabad"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/-2128816680.cms", "Times of India Hyderabad"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Hyderabad"),
             ],
         },
         "visakhapatnam": {
@@ -1162,8 +1216,7 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.thehindu.com/news/cities/Visakhapatnam/",
             "feeds": [
                 ("https://www.thehindu.com/news/cities/Visakhapatnam/?service=rss", "The Hindu Vizag"),
-                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Andhra Pradesh"),
             ],
         },
         "vijayawada": {
@@ -1171,7 +1224,28 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.deccanchronicle.com/nation/current-affairs",
             "feeds": [
                 ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Andhra Pradesh"),
+            ],
+        },
+        "amaravati": {
+            "channel": "The Hindu — Amaravati",
+            "channel_url": "https://www.thehindu.com/",
+            "feeds": [
+                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
+            ],
+        },
+        "guntur": {
+            "channel": "Deccan Chronicle — Guntur",
+            "channel_url": "https://www.deccanchronicle.com/",
+            "feeds": [
+                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
+            ],
+        },
+        "warangal": {
+            "channel": "Deccan Chronicle — Warangal",
+            "channel_url": "https://www.deccanchronicle.com/",
+            "feeds": [
+                ("https://www.thehindu.com/news/national/?service=rss", "The Hindu National"),
             ],
         },
         # ── WEST BENGAL ─────────────────────────────────────────────────────────
@@ -1180,8 +1254,21 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.thehindu.com/news/cities/kolkata/",
             "feeds": [
                 ("https://www.thehindu.com/news/cities/kolkata/?service=rss", "The Hindu Kolkata"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/-2128822085.cms", "Times of India Kolkata"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Kolkata"),
+            ],
+        },
+        "howrah": {
+            "channel": "The Hindu — Howrah",
+            "channel_url": "https://www.thehindu.com/news/cities/kolkata/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/kolkata/?service=rss", "The Hindu West Bengal"),
+            ],
+        },
+        "siliguri": {
+            "channel": "The Hindu — Siliguri",
+            "channel_url": "https://www.thehindu.com/news/cities/kolkata/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/kolkata/?service=rss", "The Hindu West Bengal"),
             ],
         },
         # ── GUJARAT ──────────────────────────────────────────────────────────────
@@ -1189,25 +1276,38 @@ def get_live_news(city: str = "Mumbai"):
             "channel": "Times of India — Ahmedabad",
             "channel_url": "https://timesofindia.indiatimes.com/city/ahmedabad",
             "feeds": [
-                ("https://timesofindia.indiatimes.com/rssfeeds/-2128816658.cms", "Times of India Ahmedabad"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India India"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Gujarat"),
             ],
         },
         "surat": {
             "channel": "Times of India — Surat",
             "channel_url": "https://timesofindia.indiatimes.com/city/surat",
             "feeds": [
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Gujarat"),
             ],
         },
         "vadodara": {
             "channel": "Times of India — Vadodara",
             "channel_url": "https://timesofindia.indiatimes.com/city/vadodara",
             "feeds": [
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Gujarat"),
+            ],
+        },
+        "rajkot": {
+            "channel": "Times of India — Rajkot",
+            "channel_url": "https://timesofindia.indiatimes.com/city/rajkot",
+            "feeds": [
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+            ],
+        },
+        "gandhinagar": {
+            "channel": "Times of India — Gandhinagar",
+            "channel_url": "https://timesofindia.indiatimes.com/city/ahmedabad",
+            "feeds": [
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
             ],
         },
         # ── RAJASTHAN ────────────────────────────────────────────────────────────
@@ -1215,199 +1315,180 @@ def get_live_news(city: str = "Mumbai"):
             "channel": "Dainik Jagran — Rajasthan",
             "channel_url": "https://www.jagran.com/rajasthan/jaipur.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-rajasthan.xml", "Dainik Jagran Rajasthan"),
                 ("https://www.amarujala.com/rss/rajasthan.xml", "Amar Ujala Rajasthan"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
             ],
         },
         "jodhpur": {
-            "channel": "Dainik Jagran — Rajasthan",
+            "channel": "Dainik Jagran — Jodhpur",
             "channel_url": "https://www.jagran.com/rajasthan",
             "feeds": [
-                ("https://www.jagran.com/rss/news-rajasthan.xml", "Dainik Jagran Rajasthan"),
                 ("https://www.amarujala.com/rss/rajasthan.xml", "Amar Ujala Rajasthan"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Rajasthan"),
             ],
         },
         "udaipur": {
-            "channel": "Dainik Jagran — Rajasthan",
+            "channel": "Dainik Jagran — Udaipur",
             "channel_url": "https://www.jagran.com/rajasthan",
             "feeds": [
-                ("https://www.jagran.com/rss/news-rajasthan.xml", "Dainik Jagran Rajasthan"),
                 ("https://www.amarujala.com/rss/rajasthan.xml", "Amar Ujala Rajasthan"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV Rajasthan"),
             ],
         },
         "kota": {
-            "channel": "Dainik Jagran — Rajasthan",
+            "channel": "Dainik Jagran — Kota",
             "channel_url": "https://www.jagran.com/rajasthan",
             "feeds": [
-                ("https://www.jagran.com/rss/news-rajasthan.xml", "Dainik Jagran Rajasthan"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.amarujala.com/rss/rajasthan.xml", "Amar Ujala Rajasthan"),
             ],
         },
         # ── UTTAR PRADESH ─────────────────────────────────────────────────────────
         "lucknow": {
             "channel": "Dainik Jagran — Lucknow",
-            "channel_url": "https://www.jagran.com/uttar-pradesh/lucknow.html",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/lucknow-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-uttar-pradesh.xml", "Dainik Jagran UP"),
                 ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
-                ("https://www.hindustantimes.com/feeds/rss/lucknow-news/rssfeed.xml", "Hindustan Times Lucknow"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India UP"),
             ],
         },
         "kanpur": {
-            "channel": "Amar Ujala — Kanpur",
-            "channel_url": "https://www.amarujala.com/uttar-pradesh/kanpur",
+            "channel": "Dainik Jagran — Kanpur",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/kanpur-news-hindi.html",
             "feeds": [
                 ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
-                ("https://www.jagran.com/rss/news-uttar-pradesh.xml", "Dainik Jagran UP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "agra": {
-            "channel": "Amar Ujala — Agra",
-            "channel_url": "https://www.amarujala.com/uttar-pradesh/agra",
+            "channel": "Dainik Jagran — Agra",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/agra-news-hindi.html",
             "feeds": [
                 ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
-                ("https://www.jagran.com/rss/news-uttar-pradesh.xml", "Dainik Jagran UP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "varanasi": {
             "channel": "Dainik Jagran — Varanasi",
-            "channel_url": "https://www.jagran.com/uttar-pradesh/varanasi.html",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/varanasi-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-uttar-pradesh.xml", "Dainik Jagran UP"),
                 ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "prayagraj": {
             "channel": "Dainik Jagran — Prayagraj",
-            "channel_url": "https://www.jagran.com/uttar-pradesh/allahabad.html",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/allahabad-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-uttar-pradesh.xml", "Dainik Jagran UP"),
                 ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "meerut": {
-            "channel": "Amar Ujala — Meerut",
-            "channel_url": "https://www.amarujala.com/uttar-pradesh/meerut",
+            "channel": "Dainik Jagran — Meerut",
+            "channel_url": "https://www.jagran.com/uttar-pradesh/meerut-news-hindi.html",
             "feeds": [
                 ("https://www.amarujala.com/rss/uttar-pradesh.xml", "Amar Ujala UP"),
-                ("https://www.jagran.com/rss/news-uttar-pradesh.xml", "Dainik Jagran UP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         # ── MADHYA PRADESH ────────────────────────────────────────────────────────
         "bhopal": {
-            "channel": "Dainik Jagran — Madhya Pradesh",
-            "channel_url": "https://www.jagran.com/madhya-pradesh/bhopal.html",
+            "channel": "Dainik Jagran — Bhopal",
+            "channel_url": "https://www.jagran.com/madhya-pradesh/bhopal-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-madhya-pradesh.xml", "Dainik Jagran MP"),
                 ("https://www.amarujala.com/rss/madhya-pradesh.xml", "Amar Ujala MP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "indore": {
             "channel": "Dainik Jagran — Indore",
-            "channel_url": "https://www.jagran.com/madhya-pradesh/indore.html",
+            "channel_url": "https://www.jagran.com/madhya-pradesh/indore-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-madhya-pradesh.xml", "Dainik Jagran MP"),
                 ("https://www.amarujala.com/rss/madhya-pradesh.xml", "Amar Ujala MP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "jabalpur": {
-            "channel": "Dainik Jagran — Madhya Pradesh",
-            "channel_url": "https://www.jagran.com/madhya-pradesh/jabalpur.html",
+            "channel": "Dainik Jagran — Jabalpur",
+            "channel_url": "https://www.jagran.com/madhya-pradesh/jabalpur-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-madhya-pradesh.xml", "Dainik Jagran MP"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.amarujala.com/rss/madhya-pradesh.xml", "Amar Ujala MP"),
+            ],
+        },
+        "gwalior": {
+            "channel": "Dainik Jagran — Gwalior",
+            "channel_url": "https://www.jagran.com/madhya-pradesh/gwalior-news-hindi.html",
+            "feeds": [
+                ("https://www.amarujala.com/rss/madhya-pradesh.xml", "Amar Ujala MP"),
             ],
         },
         # ── BIHAR ─────────────────────────────────────────────────────────────────
         "patna": {
-            "channel": "Dainik Jagran — Bihar",
-            "channel_url": "https://www.jagran.com/bihar/patna.html",
+            "channel": "Dainik Jagran — Patna",
+            "channel_url": "https://www.jagran.com/bihar/patna-city-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-bihar.xml", "Dainik Jagran Bihar"),
                 ("https://www.amarujala.com/rss/bihar.xml", "Amar Ujala Bihar"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "gaya": {
-            "channel": "Dainik Jagran — Bihar",
-            "channel_url": "https://www.jagran.com/bihar",
+            "channel": "Dainik Jagran — Gaya",
+            "channel_url": "https://www.jagran.com/bihar/gaya-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-bihar.xml", "Dainik Jagran Bihar"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.amarujala.com/rss/bihar.xml", "Amar Ujala Bihar"),
             ],
         },
         "muzaffarpur": {
-            "channel": "Dainik Jagran — Bihar",
-            "channel_url": "https://www.jagran.com/bihar",
+            "channel": "Dainik Jagran — Muzaffarpur",
+            "channel_url": "https://www.jagran.com/bihar/muzaffarpur-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-bihar.xml", "Dainik Jagran Bihar"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.amarujala.com/rss/bihar.xml", "Amar Ujala Bihar"),
             ],
         },
         # ── JHARKHAND ──────────────────────────────────────────────────────────────
         "ranchi": {
-            "channel": "Dainik Jagran — Jharkhand",
-            "channel_url": "https://www.jagran.com/jharkhand",
+            "channel": "Dainik Jagran — Ranchi",
+            "channel_url": "https://www.jagran.com/jharkhand/ranchi-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-jharkhand.xml", "Dainik Jagran Jharkhand"),
                 ("https://www.amarujala.com/rss/breaking-news.xml", "Amar Ujala"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         # ── PUNJAB / HARYANA ──────────────────────────────────────────────────────
         "chandigarh": {
-            "channel": "Hindustan Times — Chandigarh",
-            "channel_url": "https://www.hindustantimes.com/cities/chandigarh-news",
+            "channel": "Dainik Jagran — Chandigarh",
+            "channel_url": "https://www.jagran.com/punjab/chandigarh-news-hindi.html",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/chandigarh-news/rssfeed.xml", "Hindustan Times Chandigarh"),
-                ("https://www.jagran.com/rss/news-punjab.xml", "Dainik Jagran Punjab"),
+                ("https://www.amarujala.com/rss/punjab.xml", "Amar Ujala Punjab"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "ludhiana": {
-            "channel": "Dainik Jagran — Punjab",
-            "channel_url": "https://www.jagran.com/punjab/ludhiana.html",
+            "channel": "Dainik Jagran — Ludhiana",
+            "channel_url": "https://www.jagran.com/punjab/ludhiana-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-punjab.xml", "Dainik Jagran Punjab"),
                 ("https://www.amarujala.com/rss/punjab.xml", "Amar Ujala Punjab"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "amritsar": {
-            "channel": "Dainik Jagran — Punjab",
-            "channel_url": "https://www.jagran.com/punjab/amritsar.html",
+            "channel": "Dainik Jagran — Amritsar",
+            "channel_url": "https://www.jagran.com/punjab/amritsar-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-punjab.xml", "Dainik Jagran Punjab"),
                 ("https://www.amarujala.com/rss/punjab.xml", "Amar Ujala Punjab"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         "jalandhar": {
-            "channel": "Dainik Jagran — Punjab",
-            "channel_url": "https://www.jagran.com/punjab/jalandhar.html",
+            "channel": "Dainik Jagran — Jalandhar",
+            "channel_url": "https://www.jagran.com/punjab/jalandhar-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-punjab.xml", "Dainik Jagran Punjab"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://www.amarujala.com/rss/punjab.xml", "Amar Ujala Punjab"),
             ],
         },
-        # ── HARYANA ─────────────────────────────────────────────────────────────
+        "ambala": {
+            "channel": "Dainik Jagran — Ambala",
+            "channel_url": "https://www.jagran.com/haryana/ambala-news-hindi.html",
+            "feeds": [
+                ("https://www.amarujala.com/rss/punjab.xml", "Amar Ujala Punjab"),
+            ],
+        },
         "faridabad": {
             "channel": "Hindustan Times — Faridabad",
             "channel_url": "https://www.hindustantimes.com/cities/faridabad-news",
             "feeds": [
-                ("https://www.hindustantimes.com/feeds/rss/delhi-news/rssfeed.xml", "Hindustan Times NCR"),
-                ("https://www.jagran.com/rss/news-haryana.xml", "Dainik Jagran Haryana"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India NCR"),
+                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV NCR"),
             ],
         },
         # ── UTTARAKHAND ─────────────────────────────────────────────────────────
@@ -1416,16 +1497,14 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.amarujala.com/uttarakhand/dehradun",
             "feeds": [
                 ("https://www.amarujala.com/rss/uttarakhand.xml", "Amar Ujala Uttarakhand"),
-                ("https://www.jagran.com/rss/news-uttarakhand.xml", "Dainik Jagran Uttarakhand"),
-                ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
         # ── HIMACHAL ─────────────────────────────────────────────────────────────
         "shimla": {
-            "channel": "Dainik Jagran — Himachal Pradesh",
-            "channel_url": "https://www.jagran.com/himachal-pradesh",
+            "channel": "Dainik Jagran — Shimla",
+            "channel_url": "https://www.jagran.com/himachal-pradesh/shimla-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-himachal-pradesh.xml", "Dainik Jagran HP"),
+                ("https://www.amarujala.com/rss/breaking-news.xml", "Amar Ujala"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
@@ -1435,7 +1514,14 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.ndtv.com/india",
             "feeds": [
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
+            ],
+        },
+        "dibrugarh": {
+            "channel": "Times of India — Dibrugarh",
+            "channel_url": "https://timesofindia.indiatimes.com/",
+            "feeds": [
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
             ],
         },
         # ── GOA ───────────────────────────────────────────────────────────────────
@@ -1443,7 +1529,7 @@ def get_live_news(city: str = "Mumbai"):
             "channel": "Times of India — Goa",
             "channel_url": "https://timesofindia.indiatimes.com/city/goa",
             "feeds": [
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
@@ -1453,7 +1539,6 @@ def get_live_news(city: str = "Mumbai"):
             "channel_url": "https://www.thehindu.com/news/cities/Kochi/",
             "feeds": [
                 ("https://www.thehindu.com/news/cities/Kochi/?service=rss", "The Hindu Kochi"),
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
@@ -1465,26 +1550,39 @@ def get_live_news(city: str = "Mumbai"):
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
+        "kozhikode": {
+            "channel": "The Hindu — Kozhikode",
+            "channel_url": "https://www.thehindu.com/",
+            "feeds": [
+                ("https://www.thehindu.com/news/cities/Kochi/?service=rss", "The Hindu Kerala"),
+            ],
+        },
         # ── ODISHA ────────────────────────────────────────────────────────────────
         "bhubaneswar": {
             "channel": "Times of India — Bhubaneswar",
             "channel_url": "https://timesofindia.indiatimes.com/city/bhubaneswar",
             "feeds": [
-                ("https://timesofindia.indiatimes.com/rssfeeds/4719148.cms", "Times of India"),
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
+            ],
+        },
+        "cuttack": {
+            "channel": "Times of India — Cuttack",
+            "channel_url": "https://timesofindia.indiatimes.com/",
+            "feeds": [
+                ("https://timesofindia.indiatimes.com/rssfeedstopstories.cms", "Times of India"),
             ],
         },
         # ── CHHATTISGARH ──────────────────────────────────────────────────────────
         "raipur": {
-            "channel": "Dainik Jagran — Chhattisgarh",
-            "channel_url": "https://www.jagran.com/chhattisgarh",
+            "channel": "Dainik Jagran — Raipur",
+            "channel_url": "https://www.jagran.com/chhattisgarh/raipur-news-hindi.html",
             "feeds": [
-                ("https://www.jagran.com/rss/news-chhattisgarh.xml", "Dainik Jagran CG"),
+                ("https://www.amarujala.com/rss/breaking-news.xml", "Amar Ujala"),
                 ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
             ],
         },
     }
-
     # National fallback feeds (ordered by reliability)
     NATIONAL_FALLBACK = [
         ("https://feeds.feedburner.com/ndtvnews-india-news", "NDTV India"),
@@ -1522,24 +1620,38 @@ def get_live_news(city: str = "Mumbai"):
         try:
             res = requests.get(
                 feed_url, timeout=8,
-                headers={"User-Agent": "CivicMindAI/1.0 (+https://github.com/itzdevilsunny/civic-mind-ai)"}
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
             )
             if res.status_code == 200:
                 root = ET.fromstring(res.content)
                 ns = {"atom": "http://www.w3.org/2005/Atom"}
                 feed_items = root.findall(".//item") or root.findall(".//atom:entry", ns)
                 for item in feed_items:
-                    title_el    = item.find("title")    or item.find("atom:title", ns)
-                    desc_el     = item.find("description") or item.find("atom:summary", ns)
-                    link_el     = item.find("link")     or item.find("atom:link", ns)
-                    date_el     = item.find("pubDate")  or item.find("atom:published", ns)
-                    img_el      = item.find("enclosure") or item.find(".//media:content", {"media": "http://search.yahoo.com/mrss/"})
+                    title_el = item.find("title")
+                    if title_el is None:
+                        title_el = item.find("atom:title", ns)
+
+                    desc_el = item.find("description")
+                    if desc_el is None:
+                        desc_el = item.find("atom:summary", ns)
+
+                    link_el = item.find("link")
+                    if link_el is None:
+                        link_el = item.find("atom:link", ns)
+
+                    date_el = item.find("pubDate")
+                    if date_el is None:
+                        date_el = item.find("atom:published", ns)
+
+                    img_el = item.find("enclosure")
+                    if img_el is None:
+                        img_el = item.find(".//media:content", {"media": "http://search.yahoo.com/mrss/"})
 
                     title    = (title_el.text or "").strip()  if title_el is not None else ""
                     desc     = (desc_el.text  or "").strip()  if desc_el  is not None else ""
                     link     = (link_el.text  or link_el.get("href", "")).strip() if link_el is not None else ""
                     pub_date = (date_el.text  or "").strip()  if date_el  is not None else ""
-                    img_url  = img_el.get("url", "") if img_el is not None else ""
+                    img_url  = img_el.get("url", "") if img_el is not None and img_el.get("url") else ""
 
                     # Strip HTML from description
                     import re
