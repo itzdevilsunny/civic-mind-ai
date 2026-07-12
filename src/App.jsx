@@ -1122,7 +1122,7 @@ export default function App() {
                     <span className="card-subtitle">Live {cityInfo?.label || 'City'} Local News</span>
                   </div>
                   <div className="flex flex-col gap-3 max-h-[200px] overflow-y-auto pr-1">
-                    {liveNews && liveNews.slice(0, 3).map((art, idx) => (
+                    {liveNews && liveNews.articles && liveNews.articles.slice(0, 3).map((art, idx) => (
                       <a key={idx} href={art.link} target="_blank" rel="noopener noreferrer" className="p-2 border border-slate-100 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-850 transition-colors block">
                         <div className="font-bold text-xs text-slate-850 dark:text-slate-150 line-clamp-1">{art.title}</div>
                         <div className="text-[10px] text-slate-450 mt-1">{art.pubDate}</div>
