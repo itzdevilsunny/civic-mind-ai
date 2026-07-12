@@ -272,14 +272,14 @@ export default function App() {
     Promise.all([
       fetch(`/api/live/weather?${geoQ}`).then(res => res.json()).catch(() => null),
       fetch(`/api/live/aqi?${geoQ2}`).then(res => res.json()).catch(() => null),
-      fetch('/api/live/transport').then(res => res.json()).catch(() => []),
-      fetch('/api/live/market').then(res => res.json()).catch(() => null),
-      fetch('/api/live/news').then(res => res.json()).catch(() => []),
+      fetch(`/api/live/transport?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => []),
+      fetch(`/api/live/market`).then(res => res.json()).catch(() => null),
+      fetch(`/api/live/news?city=${encodeURIComponent(cityInfo.label)}`).then(res => res.json()).catch(() => []),
       fetch('/api/tickets').then(res => res.json()).catch(() => null),
-      fetch('/api/telemetry').then(res => res.json()).catch(() => []),
+      fetch(`/api/telemetry?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => []),
       fetch('/api/actions').then(res => res.json()).catch(() => []),
       fetch(`/api/live/aqi/forecast?${geoQ2}`).then(res => res.json()).catch(() => null),
-      fetch('/api/live/bikepoints').then(res => res.json()).catch(() => null),
+      fetch(`/api/live/bikepoints?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => null),
       fetch('/api/sustainability/metrics').then(res => res.json()).catch(() => null),
       fetch('/api/proposals').then(res => res.json()).catch(() => [])
     ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData, proposalsData]) => {
