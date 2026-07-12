@@ -12,8 +12,8 @@ const initialNodes = [
   { id: 'incident-1', type: 'incident', name: 'Water Main Burst - Waterloo Road', lat: 51.5033, lon: -0.1123, status: 'Critical', metric: 'Water depth: 15cm | Response team dispatched', color: '#ef4444' }
 ];
 
-export default function DigitalTwin({ onSelectNode, activeIncident }) {
-  const [nodes, setNodes] = useState(initialNodes);
+export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [] }) {
+  const [nodes, setNodes] = useState(nodesList.length > 0 ? nodesList : initialNodes);
   const [selectedNode, setSelectedNode] = useState(null);
   const [activeLayers, setActiveLayers] = useState({
     camera: true,
@@ -22,6 +22,12 @@ export default function DigitalTwin({ onSelectNode, activeIncident }) {
     power: true,
     incident: true
   });
+
+  useEffect(() => {
+    if (nodesList && nodesList.length > 0) {
+      setNodes(nodesList);
+    }
+  }, [nodesList]);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);

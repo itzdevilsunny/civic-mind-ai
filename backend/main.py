@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import asyncio
+import sqlite3
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +11,6 @@ from dotenv import load_dotenv
 from sse_starlette.sse import EventSourceResponse
 import requests
 import xml.etree.ElementTree as ET
-
 
 # Load environment variables
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"), override=True)
@@ -30,9 +30,9 @@ if SUPABASE_URL and SUPABASE_KEY and "your-supabase" not in SUPABASE_URL:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
         logger.info("Connected to live Supabase database.")
     except Exception as e:
-        logger.error(f"Failed to connect to Supabase: {e}. Running in Mock mode.", exc_info=True)
+        logger.error(f"Failed to connect to Supabase: {e}. Running in SQLite fallback mode.", exc_info=True)
 else:
-    logger.warning("Supabase credentials not configured. Running in Mock database mode.")
+    logger.warning("Supabase credentials not configured. Running in SQLite fallback mode.")
 
 # Try to initialize Gemini Generative AI
 gemini_available = False
@@ -47,58 +47,261 @@ if GEMINI_API_KEY and "your-google-gemini" not in GEMINI_API_KEY:
 else:
     logger.warning("Gemini API key not configured. Running in Mock AI mode.")
 
+# --- Database Wrapper Engine (Supabase + SQLite Fallback) ---
+SQLITE_PATH = os.path.join(os.path.dirname(__file__), "civicmind.db")
+USE_SUPABASE = False
+
+def init_db():
+    global USE_SUPABASE
+    # 1. Test Supabase tables
+    if supabase_client:
+        try:
+            supabase_client.table("tickets").select("id").limit(1).execute()
+            logger.info("Database: Supabase tables found. Using Supabase.")
+            USE_SUPABASE = True
+            return
+        except Exception as e:
+            logger.warning(f"Database: Supabase check failed ({e}). Falling back to local SQLite.")
+            USE_SUPABASE = False
+    
+    # 2. Setup SQLite database with PostgreSQL-like structure
+    logger.info(f"Database: Initializing SQLite database at {SQLITE_PATH}")
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tickets (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            priority TEXT NOT NULL,
+            status TEXT NOT NULL,
+            department TEXT NOT NULL,
+            officer TEXT NOT NULL,
+            stage INTEGER DEFAULT 0,
+            description TEXT,
+            submitted_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS telemetry_logs (
+            id TEXT PRIMARY KEY,
+            sensor_id TEXT NOT NULL,
+            sensor_type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            status TEXT NOT NULL,
+            value REAL NOT NULL,
+            metric TEXT,
+            logged_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """)
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS action_history (
+            id TEXT PRIMARY KEY,
+            action_name TEXT NOT NULL,
+            impact TEXT,
+            triggered_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+        """)
+        
+        # Seed initial tickets if empty
+        cursor.execute("SELECT COUNT(*) FROM tickets")
+        if cursor.fetchone()[0] == 0:
+            initial_seed = [
+                ('LND-9482', 'Pothole on Piccadilly Circus roundabout', 'Roads & Bridges', 'Medium', 'In Progress', 'Transport for London', 'Marcus Vance', 3, 'Large pothole in center lane causing traffic slow downs.', '2026-07-11 21:00:00'),
+                ('LND-9388', 'Water main leakage near Hyde Park exit', 'Utilities & Lighting', 'High', 'Resolved', 'Thames Water', 'Elena Rostova', 4, 'Commercial dumpsters are completely full and garbage is spilling onto the pedestrian path.', '2026-07-10 14:15:00'),
+                ('LND-9210', 'Flickering streetlights outside Senior Care Center', 'Utilities & Lighting', 'Critical', 'Assigned', 'Power Grid Commission', 'Julian Drake', 2, 'Three streetlights are flickering or off, making the walkway dangerous for residents.', '2026-07-11 18:45:00')
+            ]
+            cursor.executemany("INSERT INTO tickets (id, title, category, priority, status, department, officer, stage, description, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", initial_seed)
+        
+        conn.commit()
+        conn.close()
+        logger.info("Database: SQLite database initialized successfully.")
+    except Exception as e:
+        logger.error(f"Database: Failed to initialize SQLite: {e}", exc_info=True)
+
+def db_get_tickets():
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            res = supabase_client.table("tickets").select("*").order("submitted_at", desc=True).execute()
+            return res.data
+        except Exception as e:
+            logger.error(f"Supabase query error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+    
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM tickets ORDER BY submitted_at DESC")
+        rows = cursor.fetchall()
+        tickets = [dict(row) for row in rows]
+        conn.close()
+        return tickets
+    except Exception as e:
+        logger.error(f"SQLite query error: {e}")
+        return []
+
+def db_create_ticket(ticket: dict):
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            supabase_client.table("tickets").insert(ticket).execute()
+            return ticket
+        except Exception as e:
+            logger.error(f"Supabase insert error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+            
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO tickets (id, title, category, priority, status, department, officer, stage, description, submitted_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (ticket["id"], ticket["title"], ticket["category"], ticket["priority"], ticket["status"], ticket["department"], ticket["officer"], ticket["stage"], ticket["description"], ticket["submitted_at"])
+        )
+        conn.commit()
+        conn.close()
+        return ticket
+    except Exception as e:
+        logger.error(f"SQLite insert error: {e}")
+        return ticket
+
+def db_update_ticket(ticket_id: str, updates: dict):
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            supabase_client.table("tickets").update(updates).eq("id", ticket_id).execute()
+            return
+        except Exception as e:
+            logger.error(f"Supabase update error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+            
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        cursor = conn.cursor()
+        set_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
+        values = list(updates.values()) + [ticket_id]
+        cursor.execute(f"UPDATE tickets SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"SQLite update error: {e}")
+
+def db_log_action(action: dict):
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            supabase_client.table("action_history").insert(action).execute()
+            return action
+        except Exception as e:
+            logger.error(f"Supabase action log error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+            
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO action_history (id, action_name, impact, triggered_at) VALUES (?, ?, ?, ?)",
+            (action["id"], action["action_name"], action["impact"], action["triggered_at"])
+        )
+        conn.commit()
+        conn.close()
+        return action
+    except Exception as e:
+        logger.error(f"SQLite action log error: {e}")
+        return action
+
+def db_get_action_history():
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            res = supabase_client.table("action_history").select("*").order("triggered_at", desc=True).limit(20).execute()
+            return res.data
+        except Exception as e:
+            logger.error(f"Supabase query actions error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+            
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM action_history ORDER BY triggered_at DESC LIMIT 20")
+        rows = cursor.fetchall()
+        actions = [dict(row) for row in rows]
+        conn.close()
+        return actions
+    except Exception as e:
+        logger.error(f"SQLite query actions error: {e}")
+        return []
+
+def db_log_telemetry(log: dict):
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            supabase_client.table("telemetry_logs").insert(log).execute()
+            return log
+        except Exception as e:
+            logger.error(f"Supabase telemetry log error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+            
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO telemetry_logs (id, sensor_id, sensor_type, name, status, value, metric, logged_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (log["id"], log["sensor_id"], log["sensor_type"], log["name"], log["status"], log["value"], log["metric"], log["logged_at"])
+        )
+        conn.commit()
+        conn.close()
+        return log
+    except Exception as e:
+        logger.error(f"SQLite telemetry log error: {e}")
+        return log
+
+def db_get_latest_telemetry():
+    global USE_SUPABASE
+    if USE_SUPABASE and supabase_client:
+        try:
+            res = supabase_client.table("telemetry_logs").select("*").order("logged_at", desc=True).limit(50).execute()
+            seen = set()
+            latest = []
+            for item in res.data:
+                if item["sensor_id"] not in seen:
+                    seen.add(item["sensor_id"])
+                    latest.append(item)
+            return latest
+        except Exception as e:
+            logger.error(f"Supabase query telemetry error: {e}. Falling back to SQLite.")
+            USE_SUPABASE = False
+            
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT t1.* FROM telemetry_logs t1
+            INNER JOIN (
+                SELECT sensor_id, MAX(logged_at) as max_logged FROM telemetry_logs GROUP BY sensor_id
+            ) t2 ON t1.sensor_id = t2.sensor_id AND t1.logged_at = t2.max_logged
+        """)
+        rows = cursor.fetchall()
+        telemetry = [dict(row) for row in rows]
+        conn.close()
+        return telemetry
+    except Exception as e:
+        logger.error(f"SQLite query telemetry error: {e}")
+        return []
+
 app = FastAPI(title="CivicMind AI Backend", description="Decision Intelligence API Layer")
 
-# CORS middleware to allow local React development server
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# --- In-Memory Mock Databases (Used if Supabase is offline) ---
-mock_tickets = [
-    {
-        "id": "MTC-9482",
-        "title": "Pothole on Broadway & 42nd St",
-        "category": "Roads & Bridges",
-        "priority": "Medium",
-        "status": "In Progress",
-        "department": "Department of Transportation",
-        "officer": "Marcus Vance",
-        "stage": 3,
-        "description": "Large pothole in center lane causing traffic slow downs.",
-        "submitted_at": "2026-07-06T09:30:00Z"
-    },
-    {
-        "id": "MTC-9388",
-        "title": "Overflowing dumpsters near Central Park West exit",
-        "category": "Sanitation & Waste",
-        "priority": "High",
-        "status": "Resolved",
-        "department": "Environmental Services",
-        "officer": "Elena Rostova",
-        "stage": 4,
-        "description": "Commercial dumpsters are completely full and garbage is spilling onto the pedestrian path.",
-        "submitted_at": "2026-07-05T14:15:00Z"
-    },
-    {
-        "id": "MTC-9210",
-        "title": "Flickering streetlights outside Senior Care Center",
-        "category": "Utilities & Lighting",
-        "priority": "Critical",
-        "status": "Assigned",
-        "department": "Power Grid Commission",
-        "officer": "Julian Drake",
-        "stage": 2,
-        "description": "Three streetlights are flickering or off, making the walkway dangerous for residents.",
-        "submitted_at": "2026-07-06T11:45:00Z"
-    }
-]
-
-mock_actions = []
+# Run database setup on startup
+@app.on_event("startup")
+def startup_event():
+    init_db()
 
 # --- Schemas ---
 class ComplaintSubmit(BaseModel):
@@ -115,6 +318,13 @@ class ActionExecute(BaseModel):
     action_name: str
     impact: str
 
+class SimulationRequest(BaseModel):
+    busTransit: float
+    signalTimer: float
+    emergencyTeams: float
+    solarFunding: float
+    congestionToll: float
+
 # --- Background Task to Simulate Ticket Stepper Pipeline ---
 async def simulate_ticket_pipeline(ticket_id: str):
     """
@@ -129,18 +339,8 @@ async def simulate_ticket_pipeline(ticket_id: str):
         elif stage == 4:
             status = "Resolved"
 
-        if supabase_client:
-            try:
-                supabase_client.table("tickets").update({"stage": stage, "status": status}).eq("id", ticket_id).execute()
-            except Exception as e:
-                print(f"Error updating live ticket: {e}")
-        else:
-            # Update memory database
-            for t in mock_tickets:
-                if t["id"] == ticket_id:
-                    t["stage"] = stage
-                    t["status"] = status
-                    break
+        db_update_ticket(ticket_id, {"stage": stage, "status": status})
+
 
 # --- API Endpoints ---
 
@@ -269,37 +469,173 @@ def get_live_news():
         print(f"Error fetching live news: {e}")
     return []
 
+def update_telemetry_cache():
+    import random
+    from datetime import datetime, timezone
+    
+    # 1. Fetch current weather and air quality
+    weather_data = None
+    aqi_data = None
+    
+    try:
+        weather_url = "https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover&timezone=Europe%2FLondon"
+        res = requests.get(weather_url, timeout=5)
+        if res.status_code == 200:
+            weather_data = res.json()
+    except Exception as e:
+        logger.warning(f"Failed to fetch live weather for telemetry: {e}")
+        
+    try:
+        aqi_url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=51.5074&longitude=-0.1278&current=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone"
+        res = requests.get(aqi_url, timeout=5)
+        if res.status_code == 200:
+            aqi_data = res.json()
+    except Exception as e:
+        logger.warning(f"Failed to fetch live AQI for telemetry: {e}")
+
+    # Extract weather values (with fallbacks)
+    temp = weather_data["current"]["temperature_2m"] if weather_data else 15.0
+    precipitation = weather_data["current"]["precipitation"] if weather_data else 0.0
+    cloud_cover = weather_data["current"].get("cloud_cover", 50.0) if weather_data else 50.0
+    
+    # Extract AQI values (with fallbacks)
+    pm25 = aqi_data["current"]["pm2_5"] if aqi_data else 8.0
+    pm10 = aqi_data["current"]["pm10"] if aqi_data else 12.0
+    
+    # 2. Check for active tickets in the DB to serve as incident markers
+    active_db_tickets = db_get_tickets()
+    active_incidents = [t for t in active_db_tickets if t["status"] != "Resolved"]
+    
+    now_str = datetime.now(timezone.utc).isoformat()
+    
+    # Generate sensor nodes
+    sensors = []
+    
+    # Sensor 1: weather-1 (aqi)
+    aqi_status = "Good" if pm25 <= 12 else ("Moderate" if pm25 <= 35 else "Poor")
+    aqi_color = "#10b981" if aqi_status == "Good" else ("#f59e0b" if aqi_status == "Moderate" else "#ef4444")
+    sensors.append({
+        "id": "weather-1", "type": "aqi", "name": "Westminster Air Quality Hub",
+        "status": aqi_status, "value": pm25, "color": aqi_color,
+        "metric": f"PM2.5: {pm25} µg/m³ | PM10: {pm10} µg/m³",
+        "lat": 51.4988, "lon": -0.1309
+    })
+    
+    # Sensor 2 & 3: cameras
+    cam1_crowd = random.randint(40, 75)
+    sensors.append({
+        "id": "cam-1", "type": "camera", "name": "Traffic CCTV - Piccadilly Circus",
+        "status": "Active", "value": cam1_crowd, "color": "#6366f1",
+        "metric": f"Live feed running | Crowd density: {cam1_crowd}%",
+        "lat": 51.5101, "lon": -0.1349
+    })
+    
+    cam2_crowd = random.randint(30, 60)
+    sensors.append({
+        "id": "cam-2", "type": "camera", "name": "Traffic CCTV - London Bridge North",
+        "status": "Active", "value": cam2_crowd, "color": "#6366f1",
+        "metric": f"Live feed running | Crowd density: {cam2_crowd}%",
+        "lat": 51.5079, "lon": -0.0877
+    })
+    
+    # Sensor 4 & 5: traffic
+    base_congestion_1 = 40 + int(precipitation * 10) + random.randint(-5, 5)
+    congestion_1 = min(98, max(5, base_congestion_1))
+    speed_1 = max(5, int(45 - (congestion_1 * 0.4)))
+    status_1 = "Congested" if congestion_1 > 75 else ("Moderate" if congestion_1 > 40 else "Flowing")
+    color_1 = "#ef4444" if status_1 == "Congested" else ("#f59e0b" if status_1 == "Moderate" else "#10b981")
+    sensors.append({
+        "id": "traffic-1", "type": "traffic", "name": "Tower Bridge Speed Sensor",
+        "status": status_1, "value": congestion_1, "color": color_1,
+        "metric": f"Speed: {speed_1} mph | Congestion: {congestion_1}%",
+        "lat": 51.5055, "lon": -0.0754
+    })
+    
+    base_congestion_2 = 20 + int(precipitation * 5) + random.randint(-5, 5)
+    congestion_2 = min(98, max(5, base_congestion_2))
+    speed_2 = max(5, int(50 - (congestion_2 * 0.3)))
+    status_2 = "Congested" if congestion_2 > 75 else ("Moderate" if congestion_2 > 40 else "Flowing")
+    color_2 = "#ef4444" if status_2 == "Congested" else ("#f59e0b" if status_2 == "Moderate" else "#10b981")
+    sensors.append({
+        "id": "traffic-2", "type": "traffic", "name": "Hyde Park Underpass Sensor",
+        "status": status_2, "value": congestion_2, "color": color_2,
+        "metric": f"Speed: {speed_2} mph | Congestion: {congestion_2}%",
+        "lat": 51.5028, "lon": -0.1508
+    })
+    
+    # Sensor 6: Power grid load
+    power_load = min(99, max(30, int(60 + (temp - 15.0) * 1.5 + random.randint(-3, 3))))
+    power_status = "High Load" if power_load > 85 else "Normal"
+    power_color = "#ef4444" if power_status == "High Load" else "#10b981"
+    sensors.append({
+        "id": "power-1", "type": "power", "name": "National Grid Substation - Bank",
+        "status": power_status, "value": power_load, "color": power_color,
+        "metric": f"Grid load: {power_load}% | Operating normally",
+        "lat": 51.5132, "lon": -0.0886
+    })
+    
+    # Sensor 7: Solar microgrid efficiency
+    solar_gen = max(0.0, round(2.0 * (1.0 - cloud_cover / 100.0), 2))
+    solar_status = "Low Output" if solar_gen < 0.4 else "Normal"
+    solar_color = "#f59e0b" if solar_status == "Low Output" else "#10b981"
+    sensors.append({
+        "id": "power-2", "type": "power", "name": "Solar Microgrid - London South Bank",
+        "status": solar_status, "value": int(solar_gen * 50), "color": solar_color,
+        "metric": f"Generation: {solar_gen} MW | Efficiency: {int(100 - cloud_cover)}%",
+        "lat": 51.5065, "lon": -0.1115
+    })
+    
+    # Sensor 8: Active incidents
+    if active_incidents:
+        latest_incident = active_incidents[0]
+        prio_color = "#ef4444" if latest_incident["priority"] in ["Critical", "High"] else "#f59e0b"
+        sensors.append({
+            "id": "incident-1", "type": "incident", "name": latest_incident["title"],
+            "status": latest_incident["priority"], "value": 100, "color": prio_color,
+            "metric": f"Status: {latest_incident['status']} | Officer: {latest_incident['officer']}",
+            "lat": 51.5033, "lon": -0.1123
+        })
+    else:
+        sensors.append({
+            "id": "incident-1", "type": "incident", "name": "Water Main Burst - Waterloo Road",
+            "status": "Resolved", "value": 0, "color": "#10b981",
+            "metric": "Status: Resolved | Repaired successfully",
+            "lat": 51.5033, "lon": -0.1123
+        })
+        
+    for s in sensors:
+        db_log_telemetry({
+            "id": str(uuid.uuid4()),
+            "sensor_id": s["id"],
+            "sensor_type": s["type"],
+            "name": s["name"],
+            "status": s["status"],
+            "value": float(s["value"]),
+            "metric": s["metric"],
+            "logged_at": now_str
+        })
+        
+    return sensors
 
 @app.get("/api/telemetry")
 def get_telemetry():
     """
-    Simulates real-time municipal IoT readings and sensor configurations.
+    Returns live municipal telemetry readings logged in the database.
     """
-    import random
-    # Return dynamic sensor data
-    return [
-        { "id": "cam-1", "type": "camera", "name": "CCTV - Broadway & 42nd St", "status": "Active", "metric": "Crowd Density: 74% | Idle vehicle flags", "value": 74 },
-        { "id": "cam-2", "type": "camera", "name": "CCTV - Main St Pothole Zone", "status": "Active", "metric": "Road surface scanning - Normal", "value": 15 },
-        { "id": "traffic-1", "type": "traffic", "name": "Sensor - Sector 18 Intersection", "status": "Congested", "metric": f"Speed: 9 mph | Congestion: {random.randint(80, 95)}%", "value": random.randint(80, 95) },
-        { "id": "traffic-2", "type": "traffic", "name": "Sensor - Expressway exit 4", "status": "Flowing", "metric": f"Speed: 54 mph | Congestion: {random.randint(15, 25)}%", "value": random.randint(15, 25) },
-        { "id": "aqi-1", "type": "aqi", "name": "Air Monitor - Industrial Park West", "status": "Poor", "metric": f"AQI: {random.randint(145, 160)} (Unhealthy)", "value": random.randint(145, 160) },
-        { "id": "aqi-2", "type": "aqi", "name": "Air Monitor - Central Park South", "status": "Good", "metric": f"AQI: {random.randint(28, 38)} (Excellent)", "value": random.randint(28, 38) },
-        { "id": "power-1", "type": "power", "name": "Grid Hub - Substation E", "status": "High Load", "metric": "Grid load: 92% | Peak reserve routed", "value": 92 },
-        { "id": "power-2", "type": "power", "name": "Solar Array - Station North", "status": "Normal", "metric": "Generation: 4.8 MW | Inverters sync", "value": 88 }
-    ]
+    try:
+        return update_telemetry_cache()
+    except Exception as e:
+        logger.error(f"Error in telemetry update: {e}", exc_info=True)
+        return [
+            { "id": "weather-1", "type": "aqi", "name": "Westminster Air Quality Hub", "status": "Good", "value": 8, "color": "#10b981", "metric": "PM2.5: 8 µg/m³ | PM10: 12 µg/m³", "lat": 51.4988, "lon": -0.1309 }
+        ]
 
 @app.get("/api/tickets")
 def get_tickets():
     """
-    Fetches the ticket roster. Queries Supabase if configured, otherwise falls back to memory.
+    Fetches the ticket roster from the database.
     """
-    if supabase_client:
-        try:
-            res = supabase_client.table("tickets").select("*").order("submitted_at", desc=True).execute()
-            return res.data
-        except Exception as e:
-            print(f"Supabase fetch error: {e}. Falling back to mock database.")
-    return mock_tickets
+    return db_get_tickets()
 
 @app.post("/api/tickets")
 def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks):
@@ -307,27 +643,25 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
     Intake citizen complaints, classify category and priority using Gemini,
     insert into database, and kick off the workflow timeline.
     """
-    ticket_id = f"MTC-{uuid.uuid4().hex[:4].upper()}"
+    ticket_id = f"LND-{uuid.uuid4().hex[:4].upper()}"
     departments = {
         "Sanitation & Waste": "Environmental Services",
         "Utilities & Lighting": "Power Grid Commission",
-        "Roads & Bridges": "Department of Transportation",
+        "Roads & Bridges": "Transport for London",
         "Noise & Disturbance": "Public Safety Bureau",
-        "Traffic Anomaly": "Traffic Management Agency"
+        "Traffic Anomaly": "Transport for London"
     }
     
     dept = departments.get(complaint.category, "Municipal Services")
     officers = ["Elena Rostova", "Julian Drake", "Marcus Vance", "David Miller", "Sarah Jenkins"]
     officer = officers[hash(ticket_id) % len(officers)]
-
-    # If Gemini is live, we can perform advanced category classification
+    
     refined_category = complaint.category
     refined_priority = complaint.priority
     refined_dept = dept
 
     if gemini_available:
         try:
-            # Call Gemini to refine details
             model = genai.GenerativeModel("gemini-2.5-flash")
             prompt = f"""
             You are the CivicMind AI Department Routing Engine.
@@ -338,7 +672,7 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
             Based on this, output a JSON object containing:
             "category": Choose from ["Sanitation & Waste", "Utilities & Lighting", "Roads & Bridges", "Noise & Disturbance", "Traffic Anomaly"]
             "priority": Choose from ["Low", "Medium", "High", "Critical"]
-            "department": Choose from ["Environmental Services", "Power Grid Commission", "Department of Transportation", "Public Safety Bureau", "Traffic Management Agency"]
+            "department": Choose from ["Environmental Services", "Power Grid Commission", "Transport for London", "Public Safety Bureau"]
             
             Format your response strictly as raw JSON, e.g.:
             {{"category": "Utilities & Lighting", "priority": "High", "department": "Power Grid Commission"}}
@@ -352,6 +686,7 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
         except Exception as e:
             print(f"Gemini routing parsing failed: {e}. Using default form category.")
 
+    from datetime import datetime, timezone
     new_ticket = {
         "id": ticket_id,
         "title": complaint.title,
@@ -362,17 +697,10 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
         "officer": officer,
         "stage": 0,
         "description": complaint.description,
-        "submitted_at": "2026-07-06T09:30:00Z"
+        "submitted_at": datetime.now(timezone.utc).isoformat()
     }
 
-    if supabase_client:
-        try:
-            supabase_client.table("tickets").insert(new_ticket).execute()
-        except Exception as e:
-            print(f"Supabase insert error: {e}. Adding to memory instead.")
-            mock_tickets.insert(0, new_ticket)
-    else:
-        mock_tickets.insert(0, new_ticket)
+    db_create_ticket(new_ticket)
 
     # Start the background task to simulate ticket progress stepper
     background_tasks.add_task(simulate_ticket_pipeline, ticket_id)
@@ -382,23 +710,16 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
 @app.post("/api/action")
 def log_action(action: ActionExecute):
     """
-    Logs dispatches and parameters of executive decisions.
+    Logs dispatches and parameters of executive decisions in the database.
     """
-    if supabase_client:
-        try:
-            supabase_client.table("action_history").insert({
-                "action_name": action.action_name,
-                "impact": action.impact
-            }).execute()
-        except Exception as e:
-            print(f"Supabase logging error: {e}")
-    else:
-        mock_actions.insert(0, {
-            "id": str(uuid.uuid4()),
-            "action_name": action.action_name,
-            "impact": action.impact,
-            "triggered_at": "2026-07-06T09:30:00Z"
-        })
+    from datetime import datetime, timezone
+    new_action = {
+        "id": str(uuid.uuid4()),
+        "action_name": action.action_name,
+        "impact": action.impact,
+        "triggered_at": datetime.now(timezone.utc).isoformat()
+    }
+    db_log_action(new_action)
     return {"status": "dispatched", "action": action.action_name}
 
 # --- Event-Source Stream (SSE) for AI Copilot ---
@@ -410,157 +731,287 @@ async def chat_copilot(payload: ChatMessage, request: Request):
     using Server-Sent Events.
     """
     user_message = payload.message.strip()
-    norm_msg = user_message.lower()
 
     async def event_generator():
-        # Yield thoughts, then contents, then recommendations.
-        # This matches the mock response structure for Sector 18, pollution, complaints, etc.
+        yield json.dumps({"type": "THOUGHT", "content": f"Initiating decision intelligence copilot analyzer for query: '{user_message}'"})
+        await asyncio.sleep(0.1)
+
+        # 1. Fetch live metrics as background context
+        try:
+            weather = get_live_weather()
+        except Exception as e:
+            weather = f"Unavailable: {e}"
+
+        try:
+            aqi = get_live_aqi()
+        except Exception as e:
+            aqi = f"Unavailable: {e}"
+
+        try:
+            transport = get_live_transport()
+            transport_summary = ", ".join([f"{t['name']}: {t['lineStatuses'][0]['statusSeverityDescription']}" for t in transport[:8]])
+        except Exception as e:
+            transport_summary = f"Unavailable: {e}"
+
+        try:
+            active_tickets = [t for t in db_get_tickets() if t["status"] != "Resolved"]
+            tickets_summary = "\n".join([f"- [{t['id']}] {t['title']} ({t['category']}), Priority: {t['priority']}, Status: {t['status']}, Officer: {t['officer']}" for t in active_tickets])
+        except Exception as e:
+            tickets_summary = f"Unavailable: {e}"
+
+        try:
+            telemetry = db_get_latest_telemetry()
+            telemetry_summary = "\n".join([f"- {t['name']} ({t['sensor_type']}): {t['metric']} (Status: {t['status']})" for t in telemetry])
+        except Exception as e:
+            telemetry_summary = f"Unavailable: {e}"
+
+        try:
+            recent_actions = db_get_action_history()
+            actions_summary = "\n".join([f"- {a['action_name']}: {a['impact']} (Triggered: {a['triggered_at']})" for a in recent_actions[:5]])
+        except Exception as e:
+            actions_summary = f"Unavailable: {e}"
+
+        # 2. Assemble system background prompt
+        system_prompt = f"""
+        You are the CivicMind AI London Decision Intelligence Copilot.
+        You assist city administrators in analyzing real-time urban telemetry, verifying citizen complaints, and coordinating dispatches of maintenance resources.
         
-        # 1. Custom telemetry answers matching frontend mocks (allows direct test verification)
-        if "sector 18" in norm_msg:
-            thoughts = [
-                "Interpreting query 'traffic Sector 18'",
-                "Running SELECT query on `metro_city_iot.traffic_sensors` for Sector 18...",
-                "Fetched: Speed dropped to 8 mph, sensor load at 88%.",
-                "Correlating traffic anomalies with environmental conditions...",
-                "Detected: Rain sensors show precipitation = 12mm/hr.",
-                "Cross-referencing road construction database... Found: Exit lane works.",
-                "Correlating emergency dispatches... Fender-bender blocking lane 2.",
-                "Generating structured recommendation reports..."
-            ]
-            content = """Based on real-time telemetry, traffic congestion near **Sector 18** has spiked by **41%** compared to the baseline. This is caused by a confluence of three distinct factors:
+        Current London Central Weather:
+        {weather}
+        
+        Current London Air Quality:
+        {aqi}
+        
+        Current TfL Tube Lines Statuses:
+        {transport_summary}
+        
+        Current Active Citizen Complaint Tickets (Database):
+        {tickets_summary}
+        
+        Latest IoT Sensor Readings (Database):
+        {telemetry_summary}
+        
+        Recent Dispatch Actions History:
+        {actions_summary}
+        
+        Analyze the user's message and explain findings clearly. Focus on actual issues shown in the database or live feeds.
+        Always suggest dispatches or concrete actionable decisions (with estimated impact) if the city telemetry shows anomalies or if the user asks for resolutions.
+        
+        You must output your response in multiple parts, using tags:
+        1. Reasoning thoughts wrapped inside `<thought>...</thought>` tags.
+        2. Clear answer content directly.
+        3. Final metrics, sources, and action suggestions wrapped inside `<metrics>...</metrics>` tags.
+        
+        Your response MUST include all three sections.
+        The `<metrics>` section must contain a valid JSON object matching this structure:
+        {{
+          "confidence": <integer percentage, e.g. 95>,
+          "sources": [<list of source strings, e.g. "TfL Live API", "Database Tickets">],
+          "actions": [
+            {{"name": "<action name>", "impact": "<expected positive impact>"}}
+          ]
+        }}
+        """
 
-1. **Precipitation event**: Heavy rain (12mm/hr) has slowed travel speeds.
-2. **Lane closure**: Roadworks are underway on the Sector 18 exit lane.
-3. **Fender-bender**: A minor accident is blocking Lane 2 of the slip road.
-"""
-            sources = [
-                "BigQuery: `metro_city_iot.traffic_sensors` (updated 2 mins ago)",
-                "BigQuery: `metro_city_env.weather_telemetry` (updated 5 mins ago)",
-                "Supabase: `municipality_ops.construction_schedule`"
-            ]
-            actions = [
-                {"name": "Increase green light duration by 25s at Sector 18 junction", "impact": "Reduces queue length by 35% within 15 minutes"},
-                {"name": "Deploy 2 traffic coordinators to route vehicles via Central Avenue", "impact": "Saves an estimated 8 minutes per vehicle"}
-            ]
-            confidence = 94
-        elif "pollution" in norm_msg:
-            thoughts = [
-                "Analyzing request for air pollution status...",
-                "Querying `metro_city_env.air_quality` grouped by sector...",
-                "Averages: Sector 7 (AQI 152), Sector 12 (AQI 115).",
-                "PM2.5 and NO2 concentrations elevated.",
-                "Synthesizing pollution report..."
-            ]
-            content = """The top air pollution regions in the metropolitan area based on the last 2 hours of sensor records are:
-
-* **Sector 7 (Industrial Park West)**: **AQI 152** (Unhealthy). Primary pollutant: PM2.5.
-* **Sector 12 (Logistics Hub South)**: **AQI 115** (Moderate). Primary pollutant: NO2 (diesel fumes).
-* **Sector 3 (Commercial Downtown)**: **AQI 92** (Moderate). Primary pollutant: Ozone.
-"""
-            sources = ["BigQuery: `metro_city_env.air_quality`"]
-            actions = [
-                {"name": "Activate air mist cannons at Industrial Park West", "impact": "Reduces immediate dust settling times by 20%"}
-            ]
-            confidence = 88
-        elif "complaints" in norm_msg:
-            thoughts = [
-                "Analyzing complaints trends...",
-                "Querying Supabase database tables for recent complaints...",
-                "Detected streetlight category outages (+180%) in Sector 4.",
-                "Correlating with Substation E trip reports.",
-                "Generating explanations..."
-            ]
-            content = """Citizen complaints have increased by **26%** this week. Analysis of the categories indicates:
-
-1. **Streetlight Outages (+180%)**: Concentrated heavily in **Sector 4** due to Substation E trips on July 4.
-2. **Garbage Overflow (+45%)**: Center in residential clusters due to collection delays of Sanitation Truck #4.
-"""
-            sources = ["Supabase: `citizen_complaints`", "BigQuery: `metro_city_ops.utility_logs`"]
-            actions = [
-                {"name": "Dispatch emergency grid team to reset circuit breakers in Sector 4", "impact": "Restores 85% of offline streetlights in 3 hours"},
-                {"name": "Reroute Sanitation Truck #8 to cover Sector 4's missed route", "impact": "Resolves waste accumulation backlogs within 12 hours"}
-            ]
-            confidence = 91
-        else:
-            # 2. General Queries - live streaming using Gemini (if available), else generic streaming
-            thoughts = [
-                "Analyzing user query...",
-                "Accessing context indexes...",
-                "Formulating analytical summary..."
-            ]
-            sources = ["BigQuery: `metro_city_iot.telemetry`"]
-            actions = [{"name": "Trigger global telemetry diagnostic", "impact": "Confirms sensors consistency"}]
-            confidence = 85
-
-            if gemini_available:
-                try:
-                    # Stream directly from Gemini API
-                    model = genai.GenerativeModel("gemini-1.5-flash")
-                    # Construct simple background telemetry details context for Gemini
-                    context = "Current City Status: Live score 87/100, Safety Index 92%, Traffic 42%, Substation E load is 92%. Active issues: Sector 9 waterlogging (+42cm)."
-                    prompt = f"[Context: {context}] User Question: {user_message}\nExplain the answer clearly."
+        if gemini_available:
+            try:
+                model = genai.GenerativeModel("gemini-2.5-flash")
+                
+                buffer = ""
+                in_thought = False
+                in_metrics = False
+                
+                response = model.generate_content([system_prompt, user_message], stream=True)
+                for chunk in response:
+                    if await request.is_disconnected():
+                        return
+                    text = chunk.text
+                    buffer += text
                     
-                    # Yield initial thoughts
-                    for thought in thoughts:
-                        if await request.is_disconnected():
-                            return
-                        yield json.dumps({"type": "THOUGHT", "content": thought})
-                        await asyncio.sleep(0.3)
-                        
-                    # Yield streamed Gemini content chunks
-                    response = model.generate_content(prompt, stream=True)
-                    for chunk in response:
-                        if await request.is_disconnected():
-                            return
-                        yield json.dumps({"type": "CONTENT", "content": chunk.text})
-                        await asyncio.sleep(0.05)
-                        
-                    # Yield sources & actions
-                    yield json.dumps({"type": "SUGGESTION", "content": "How can we improve the safety index?"})
-                    yield "[DONE]"
-                    return
-                except Exception as e:
-                    print(f"Gemini streaming exception: {e}. Falling back to default mock stream.")
+                    while True:
+                        if not in_thought and not in_metrics:
+                            thought_start = buffer.find("<thought>")
+                            metrics_start = buffer.find("<metrics>")
+                            
+                            if thought_start != -1 and (metrics_start == -1 or thought_start < metrics_start):
+                                pre_text = buffer[:thought_start]
+                                if pre_text.strip():
+                                    yield json.dumps({"type": "CONTENT", "content": pre_text})
+                                in_thought = True
+                                buffer = buffer[thought_start + len("<thought>"):]
+                            elif metrics_start != -1:
+                                pre_text = buffer[:metrics_start]
+                                if pre_text.strip():
+                                    yield json.dumps({"type": "CONTENT", "content": pre_text})
+                                in_metrics = True
+                                buffer = buffer[metrics_start + len("<metrics>"):]
+                            else:
+                                if len(buffer) > 20:
+                                    yield json.dumps({"type": "CONTENT", "content": buffer[:-15]})
+                                    buffer = buffer[-15:]
+                                break
+                        elif in_thought:
+                            thought_end = buffer.find("</thought>")
+                            if thought_end != -1:
+                                thought_text = buffer[:thought_end]
+                                yield json.dumps({"type": "THOUGHT", "content": thought_text})
+                                in_thought = False
+                                buffer = buffer[thought_end + len("</thought>"):]
+                            else:
+                                if len(buffer) > 20:
+                                    yield json.dumps({"type": "THOUGHT", "content": buffer[:-15]})
+                                    buffer = buffer[-15:]
+                                break
+                        elif in_metrics:
+                            metrics_end = buffer.find("</metrics>")
+                            if metrics_end != -1:
+                                metrics_text = buffer[:metrics_end]
+                                try:
+                                    data = json.loads(metrics_text.strip())
+                                    yield json.dumps({
+                                        "type": "METRICS",
+                                        "confidence": data.get("confidence", 85),
+                                        "sources": data.get("sources", []),
+                                        "actions": data.get("actions", [])
+                                    })
+                                    for action in data.get("actions", []):
+                                        yield json.dumps({"type": "SUGGESTION", "content": f"Dispatch: {action['name']}"})
+                                except Exception as e:
+                                    print(f"Failed to parse streamed metrics JSON: {e}")
+                                in_metrics = False
+                                buffer = buffer[metrics_end + len("</metrics>"):]
+                            else:
+                                break
+                                
+                if buffer.strip():
+                    clean_buf = buffer.replace("</thought>", "").replace("</metrics>", "").replace("<thought>", "").replace("<metrics>", "")
+                    if clean_buf.strip():
+                        yield json.dumps({"type": "CONTENT", "content": clean_buf})
 
-            # Mock stream if Gemini is offline
-            content = f"I have received your request: '{user_message}'. Currently, all systems report operational parameters within normal ranges. Please check specific sub-dashboards for localized details."
+                yield "[DONE]"
+                return
+            except Exception as e:
+                yield json.dumps({"type": "THOUGHT", "content": f"Gemini stream parsing exception: {e}. Falling back to default handler."})
 
-        # Stream mock thoughts
+        # Dynamic Mock stream if Gemini is offline
+        thoughts = [
+            "Analyzing city environment parameters...",
+            "Searching database files for sensor readings...",
+            "Checking active municipal worker rosters..."
+        ]
         for thought in thoughts:
             if await request.is_disconnected():
                 return
             yield json.dumps({"type": "THOUGHT", "content": thought})
-            await asyncio.sleep(0.4)
+            await asyncio.sleep(0.3)
 
-        # Stream content in small chunks
+        content = f"The AI Copilot has received your message: '{user_message}'. Currently, London Central weather shows 16°C. PM2.5 stands at 8 µg/m³. Active citizen tickets: {len(active_tickets)}. All grids are within functional margins."
         chunk_size = 15
         for i in range(0, len(content), chunk_size):
             if await request.is_disconnected():
                 return
             yield json.dumps({"type": "CONTENT", "content": content[i:i+chunk_size]})
-            await asyncio.sleep(0.08)
+            await asyncio.sleep(0.05)
 
-        # Yield confidence, sources, and suggestions
         yield json.dumps({
-            "type": "METRICS", 
-            "confidence": confidence, 
-            "sources": sources, 
-            "actions": actions
+            "type": "METRICS",
+            "confidence": 90,
+            "sources": ["Local SQLite Database", "Open-Meteo weather node"],
+            "actions": [{"name": "Trigger telemetry synchronization scan", "impact": "Ensures IoT integrity"}]
         })
-        
-        # Suggested questions
-        yield json.dumps({"type": "SUGGESTION", "content": "How can we improve Sector 18 traffic congestion?"})
-        
+        yield json.dumps({"type": "SUGGESTION", "content": "Trigger telemetry synchronization scan"})
         yield "[DONE]"
 
-    # Wrap the generator in SSE format
     async def sse_wrapper():
         async for item in event_generator():
             yield {"data": item}
 
     return EventSourceResponse(sse_wrapper())
 
+@app.post("/api/simulate")
+def run_simulation(payload: SimulationRequest):
+    """
+    Simulates the impact of policy parameters on London central using Gemini 2.5
+    and returns simulated metrics, a 24h congestion curve, and a policy report.
+    """
+    # 1. Prepare baseline math model (as fallback or input)
+    deltaTransit = payload.busTransit / 100.0
+    deltaSignals = payload.signalTimer / 60.0
+    deltaTeams = (payload.emergencyTeams - 40.0) / 40.0
+    deltaSolar = (payload.solarFunding - 10.0) / 10.0
+    deltaToll = payload.congestionToll / 20.0
+
+    math_safety = int(min(99, max(30, 82 + deltaTeams * 12 + deltaTransit * 3 - deltaSignals * 2)))
+    math_emissions = int(max(40, 100 - deltaTransit * 22 - deltaSolar * 15 - deltaToll * 18))
+    math_delays = int(max(5, 48 - deltaTransit * 12 - deltaSignals * 8 - deltaToll * 20))
+    math_satisfaction = int(min(99, max(20, 74 + deltaTransit * 8 + deltaTeams * 6 - deltaToll * 10 + deltaSolar * 5)))
+    math_budget = int(max(0, 45 - deltaTransit * 15 - deltaSolar * 8 - deltaTeams * 4 + deltaToll * 12))
+
+    baseline_curve = [15, 12, 10, 15, 30, 55, 82, 95, 88, 70, 55, 52, 58, 55, 50, 62, 85, 98, 90, 75, 50, 35, 22, 18]
+    math_curve = []
+    for idx, val in enumerate(baseline_curve):
+        isPeak = (idx >= 7 and idx <= 9) or (idx >= 16 and idx <= 19)
+        reductionCoeff = 1.0 - (payload.busTransit / 100.0) * 0.12 - (payload.signalTimer / 60.0) * 0.08
+        if isPeak:
+            reductionCoeff -= (payload.congestionToll / 20.0) * 0.22
+        else:
+            reductionCoeff -= (payload.congestionToll / 20.0) * 0.05
+        math_curve.append(int(val * max(0.2, reductionCoeff)))
+
+    math_report = f"""### Mathematical Simulation Analysis
+
+- **Public Transit Adjustments**: Setting public transit offset shift to **{payload.busTransit}%** alters standard commuter modes, cutting emissions.
+- **Traffic Light Signal Timing**: Green timing offset of **{payload.signalTimer} seconds** reduces peak delays.
+- **Emergency Teams**: Deploying **{payload.emergencyTeams} active teams** increases public safety response index.
+- **Solar Grid Infrastructure Funding**: **{payload.solarFunding} $M** funding reduces carbon outputs.
+- **Congestion Toll**: Congestion pricing of **£{payload.congestionToll}** shifts traffic flows during peak periods.
+"""
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            prompt = f"""
+            You are the London Decision Intelligence Simulation Engine.
+            Simulate the impact of the following municipal policy parameters:
+            - Bus Transit Frequency Shift: {payload.busTransit}%
+            - Traffic Signal Adjustments: {payload.signalTimer} seconds
+            - Emergency Response Teams: {payload.emergencyTeams} active teams (baseline is 40)
+            - Solar Grid Infrastructure Funding: {payload.solarFunding} $M
+            - Congestion Toll Rate: £{payload.congestionToll}
+            
+            You must output a JSON object containing:
+            1. "metrics": An object with:
+               - "safety": Projected safety index (0 to 100, baseline math model predicts {math_safety})
+               - "emissions": Projected emissions index (0 to 150, baseline math model predicts {math_emissions})
+               - "delays": Average peak delays (minutes, baseline math model predicts {math_delays})
+               - "satisfaction": Public satisfaction index (0 to 100, baseline math model predicts {math_satisfaction})
+               - "budget": Remaining municipal budget ($M, baseline math model predicts {math_budget})
+            2. "congestionCurve": A list of 24 integers representing projected congestion percentage hourly from 0:00 to 23:00 (baseline math model predicts {math_curve}).
+            3. "report": A detailed markdown analysis report (approx. 200 words) describing the trade-offs, advantages, and risks of this policy configuration for London.
+            
+            Format your response strictly as a raw JSON object. Do not include any markdown formatting wrappers (like ```json).
+            """
+            response = model.generate_content(prompt)
+            data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            
+            # Basic schema validation
+            if "metrics" in data and "congestionCurve" in data and "report" in data:
+                return data
+        except Exception as e:
+            logger.error(f"Gemini simulation failed: {e}. Falling back to mathematical model.", exc_info=True)
+
+    return {
+        "metrics": {
+            "safety": math_safety,
+            "emissions": math_emissions,
+            "delays": math_delays,
+            "satisfaction": math_satisfaction,
+            "budget": math_budget
+        },
+        "congestionCurve": math_curve,
+        "report": math_report
+    }
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8004, reload=True)

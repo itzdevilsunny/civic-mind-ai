@@ -60,6 +60,7 @@ export default function App() {
   const [liveMarket, setLiveMarket] = useState(null);
   const [liveNews, setLiveNews] = useState([]);
   const [tickets, setTickets] = useState(initialTickets);
+  const [telemetry, setTelemetry] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Form State
@@ -71,9 +72,9 @@ export default function App() {
   });
 
   const [systemLogs, setSystemLogs] = useState([
-    "Westminster Grid monitoring initialized.",
-    "TfL line statuses synced.",
-    "OpenStreetMap interactive node layers ready."
+    "Traffic Agent: Westminster Grid monitoring initialized.",
+    "Transit Agent: TfL line statuses synced.",
+    "Safety Agent: OpenStreetMap interactive node layers ready."
   ]);
 
   // Load all live APIs from proxy endpoints
@@ -84,13 +85,15 @@ export default function App() {
       fetch('/api/live/transport').then(res => res.json()).catch(() => []),
       fetch('/api/live/market').then(res => res.json()).catch(() => null),
       fetch('/api/live/news').then(res => res.json()).catch(() => []),
-      fetch('/api/tickets').then(res => res.json()).catch(() => null)
-    ]).then(([weather, aqi, transport, market, news, dbTickets]) => {
+      fetch('/api/tickets').then(res => res.json()).catch(() => null),
+      fetch('/api/telemetry').then(res => res.json()).catch(() => [])
+    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
       if (market) setLiveMarket(market);
       if (news && news.length > 0) setLiveNews(news);
+      if (telemetryData && telemetryData.length > 0) setTelemetry(telemetryData);
       if (dbTickets) {
         setTickets(dbTickets);
         setIsBackendOnline(true);
@@ -117,7 +120,22 @@ export default function App() {
   }, [isDarkMode]);
 
   const executeCopilotAction = (actionName) => {
-    setSystemLogs(prev => [`Executive Command: "${actionName}"`, ...prev]);
+    const impactDescription = actionName.includes("Piccadilly") || actionName.includes("traffic")
+      ? "Green offset adjusted on Piccadilly Circus roundabout."
+      : actionName.includes("Waterloo") || actionName.includes("water")
+      ? "Mobile water tanker and suction carrier deployed to Waterloo Road."
+      : "Dispatched routine resolution crew.";
+
+    fetch('/api/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action_name: actionName,
+        impact: impactDescription
+      })
+    }).catch(err => console.error("Failed to log action:", err));
+
+    setSystemLogs(prev => [`Safety Agent: Executive Command: "${actionName}"`, ...prev]);
     
     // Create custom dynamic incident pin on map based on prompt
     if (actionName.includes("Piccadilly") || actionName.includes("traffic")) {
@@ -143,22 +161,37 @@ export default function App() {
     e.preventDefault();
     if (!complaintForm.title.trim() || !complaintForm.description.trim()) return;
 
-    const newTicket = {
-      id: `LND-${Math.floor(Math.random() * 9000) + 1000}`,
-      title: complaintForm.title,
-      category: complaintForm.category,
-      priority: complaintForm.priority,
-      status: 'Assigned',
-      department: complaintForm.category === 'Utilities & Lighting' ? 'Thames Water' : 'Transport for London',
-      officer: 'Julian Drake',
-      submittedAt: new Date().toLocaleString(),
-      stage: 1
-    };
-
-    setTickets(prev => [newTicket, ...prev]);
-    setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '' });
-    setSystemLogs(prev => [`New ticket ${newTicket.id} registered. Routing to department...`, ...prev]);
-    confetti({ particleCount: 80, spread: 60 });
+    fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(complaintForm)
+    })
+      .then(res => res.json())
+      .then(createdTicket => {
+        setTickets(prev => [createdTicket, ...prev]);
+        setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '' });
+        setSystemLogs(prev => [`[Database Sync] Ticket ${createdTicket.id} classified by Gemini. Routing to ${createdTicket.department}...`, ...prev]);
+        confetti({ particleCount: 80, spread: 60 });
+      })
+      .catch(err => {
+        console.error("Failed to submit ticket to backend:", err);
+        const fallbackTicket = {
+          id: `LND-${Math.floor(Math.random() * 9000) + 1000}`,
+          title: complaintForm.title,
+          category: complaintForm.category,
+          priority: complaintForm.priority,
+          status: 'Submission Received',
+          department: complaintForm.category === 'Utilities & Lighting' ? 'Thames Water' : 'Transport for London',
+          officer: 'Julian Drake',
+          submittedAt: new Date().toISOString(),
+          stage: 0,
+          description: complaintForm.description
+        };
+        setTickets(prev => [fallbackTicket, ...prev]);
+        setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '' });
+        setSystemLogs(prev => [`[Offline Sandbox] Local ticket ${fallbackTicket.id} registered.`, ...prev]);
+        confetti({ particleCount: 80, spread: 60 });
+      });
   };
 
   const getForecastChart = () => {
@@ -359,12 +392,13 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 min-h-[400px]">
                   <DigitalTwin 
+                    nodesList={telemetry}
                     onSelectNode={(node) => {
                       if (node.action === 'dispatch') {
-                        setSystemLogs(prev => [`[Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
+                        setSystemLogs(prev => [`Safety Agent: [Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
                         confetti({ particleCount: 80, spread: 60 });
                       } else {
-                        setSystemLogs(prev => [`Selected map telemetry: ${node.name}`, ...prev]);
+                        setSystemLogs(prev => [`Traffic Agent: Selected map telemetry: ${node.name}`, ...prev]);
                       }
                     }}
                     activeIncident={activeIncident}
@@ -527,12 +561,13 @@ export default function App() {
             <div className="flex flex-col gap-6">
               <div className="h-[450px]">
                 <DigitalTwin 
+                  nodesList={telemetry}
                   onSelectNode={(node) => {
                     if (node.action === 'dispatch') {
-                      setSystemLogs(prev => [`[Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
+                      setSystemLogs(prev => [`Safety Agent: [Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
                       confetti({ particleCount: 80, spread: 60 });
                     } else {
-                      setSystemLogs(prev => [`Selected traffic node: ${node.name}`, ...prev]);
+                      setSystemLogs(prev => [`Traffic Agent: Selected traffic node: ${node.name}`, ...prev]);
                     }
                   }}
                   activeIncident={activeIncident}
@@ -742,7 +777,7 @@ export default function App() {
 
               {/* Multi-agent status */}
               <section>
-                <MultiAgentStatus />
+                <MultiAgentStatus logsList={systemLogs} />
               </section>
 
               {/* Active tickets workflow tracker */}

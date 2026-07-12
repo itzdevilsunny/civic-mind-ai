@@ -87,7 +87,7 @@ const logPool = [
   "Tourism Agent: Cultural district footfalls rising. Recommended parking diversion notice."
 ];
 
-export default function MultiAgentStatus() {
+export default function MultiAgentStatus({ logsList = [] }) {
   const [agents, setAgents] = useState(agentData);
   const [logs, setLogs] = useState([
     "System booted. All 8 AI Agents checked in.",
@@ -95,14 +95,16 @@ export default function MultiAgentStatus() {
     "Connecting Pub/Sub queues to BigQuery warehouse..."
   ]);
 
-  // Periodically change agent states and emit new log events
+  // Sync actual system logs when they arrive
+  useEffect(() => {
+    if (logsList && logsList.length > 0) {
+      setLogs(logsList);
+    }
+  }, [logsList]);
+
+  // Periodically change agent states to simulate ongoing analysis
   useEffect(() => {
     const interval = setInterval(() => {
-      // 1. Pick a random log to append
-      const randomLog = logPool[Math.floor(Math.random() * logPool.length)];
-      setLogs(prev => [randomLog, ...prev].slice(0, 10));
-
-      // 2. Randomly change an agent's status
       setAgents(prevAgents => {
         const idx = Math.floor(Math.random() * prevAgents.length);
         const statusPool = ['Idle', 'Processing', 'Coordinating', 'Alerted'];
@@ -125,7 +127,7 @@ export default function MultiAgentStatus() {
           return agent;
         });
       });
-    }, 4000);
+    }, 6000);
 
     return () => clearInterval(interval);
   }, []);

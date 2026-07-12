@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Sliders } from 'lucide-react';
+import { Sliders, Cpu, Loader2, Sparkles } from 'lucide-react';
 
 
 export default function WhatIfSimulator() {
@@ -20,9 +20,15 @@ export default function WhatIfSimulator() {
     budget: 45 // $M available
   });
 
-  // Re-calculate projected metrics when policy params change
+  const [simulatedCurve, setSimulatedCurve] = useState(null);
+  const [aiReport, setAiReport] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Re-calculate projected metrics when policy params change (local fast preview)
   useEffect(() => {
-    // Math equations representing urban relationships
+    setAiReport('');
+    setSimulatedCurve(null);
+
     const deltaTransit = params.busTransit / 100;
     const deltaSignals = params.signalTimer / 60;
     const deltaTeams = (params.emergencyTeams - 40) / 40;
@@ -42,33 +48,47 @@ export default function WhatIfSimulator() {
     setParams(prev => ({ ...prev, [key]: parseFloat(val) }));
   };
 
+  const runAiForecast = () => {
+    setLoading(true);
+    fetch('/api/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params)
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.metrics) setMetrics(data.metrics);
+        if (data.congestionCurve) setSimulatedCurve(data.congestionCurve);
+        if (data.report) setAiReport(data.report);
+      })
+      .catch(err => {
+        console.error("AI simulation request failed:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
   // Prepare data for ECharts (24-hour congestion curve simulation)
   const getChartOptions = () => {
     const hours = Array.from({ length: 24 }, (_, i) => `${i}:00`);
-    
-    // Baseline congestion curve (double peak: 8 AM, 6 PM)
     const baseline = [15, 12, 10, 15, 30, 55, 82, 95, 88, 70, 55, 52, 58, 55, 50, 62, 85, 98, 90, 75, 50, 35, 22, 18];
     
-    // Simulate active policy effects on the curve
-    const simulated = baseline.map((val, idx) => {
-      // Impact is highest during peak hours (hours 7-9 and 16-19)
+    // Fallback math curve if AI has not run
+    const mathSimulated = baseline.map((val, idx) => {
       const isPeak = (idx >= 7 && idx <= 9) || (idx >= 16 && idx <= 19);
       let reductionCoeff = 1.0;
-      
-      // Transit frequency reduces peak congestion
       reductionCoeff -= (params.busTransit / 100) * 0.12;
-      // Signal timing reduces congestion (both peak and non-peak)
       reductionCoeff -= (params.signalTimer / 60) * 0.08;
-      // Congestion toll reduces peak congestion strongly
       if (isPeak) {
         reductionCoeff -= (params.congestionToll / 20) * 0.22;
       } else {
         reductionCoeff -= (params.congestionToll / 20) * 0.05;
       }
-      
-      const newVal = Math.round(val * Math.max(0.2, reductionCoeff));
-      return newVal;
+      return Math.round(val * Math.max(0.2, reductionCoeff));
     });
+
+    const simulated = simulatedCurve || mathSimulated;
 
     return {
       tooltip: {
@@ -138,11 +158,26 @@ export default function WhatIfSimulator() {
 
   return (
     <div className="card">
-      <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3" style={{ marginBottom: '1.5rem' }}>
-        <h3 className="card-title">
-          <Sliders className="w-5 h-5 text-blue-600" /> What-If Policy Scenario Simulator
-        </h3>
-        <span className="card-subtitle">Test and predict the systemic impact of municipal policy decisions before implementation</span>
+      <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 flex justify-between items-center" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <h3 className="card-title">
+            <Sliders className="w-5 h-5 text-blue-600" /> What-If Policy Scenario Simulator
+          </h3>
+          <span className="card-subtitle">Test and predict the systemic impact of municipal policy decisions before implementation</span>
+        </div>
+        <button
+          onClick={runAiForecast}
+          disabled={loading}
+          className="btn-3d btn-primary flex items-center gap-2 text-xs py-1.5 px-3"
+          style={{ cursor: 'pointer' }}
+        >
+          {loading ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Cpu className="w-3.5 h-3.5" />
+          )}
+          <span>{loading ? 'Analyzing...' : 'Run AI Forecast Model'}</span>
+        </button>
       </div>
 
       <div className="simulator-layout">
@@ -286,6 +321,21 @@ export default function WhatIfSimulator() {
           </div>
         </div>
       </div>
+
+      {/* AI Report Section */}
+      {aiReport && (
+        <div className="mt-6 border-t border-slate-200 dark:border-slate-800 pt-6 animate-fade-in">
+          <div className="flex items-center gap-2 mb-3 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+            <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+            <span>Gemini AI Policy Forecast Report</span>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-900 text-xs leading-relaxed text-slate-650 dark:text-slate-350">
+            <div className="prose dark:prose-invert max-w-none font-sans" style={{ whiteSpace: 'pre-wrap' }}>
+              {aiReport}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
