@@ -23,6 +23,7 @@ import WhatIfSimulator from './components/WhatIfSimulator';
 import MultiAgentStatus from './components/MultiAgentStatus';
 import WorkflowTracker from './components/WorkflowTracker';
 import SenateChamber from './components/SenateChamber';
+import DispatchControl from './components/DispatchControl';
 
 const initialTickets = [
   {
@@ -65,6 +66,7 @@ export default function App() {
   const [tickets, setTickets] = useState(initialTickets);
   const [telemetry, setTelemetry] = useState([]);
   const [senatePolicy, setSenatePolicy] = useState(null);
+  const [actionHistory, setActionHistory] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Voice Briefing States & Handlers
@@ -147,14 +149,16 @@ export default function App() {
       fetch('/api/live/market').then(res => res.json()).catch(() => null),
       fetch('/api/live/news').then(res => res.json()).catch(() => []),
       fetch('/api/tickets').then(res => res.json()).catch(() => null),
-      fetch('/api/telemetry').then(res => res.json()).catch(() => [])
-    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData]) => {
+      fetch('/api/telemetry').then(res => res.json()).catch(() => []),
+      fetch('/api/actions').then(res => res.json()).catch(() => [])
+    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
       if (market) setLiveMarket(market);
       if (news && news.length > 0) setLiveNews(news);
       if (telemetryData && telemetryData.length > 0) setTelemetry(telemetryData);
+      if (actionsData) setActionHistory(actionsData);
       if (dbTickets) {
         setTickets(dbTickets);
         setIsBackendOnline(true);
@@ -194,7 +198,9 @@ export default function App() {
         action_name: actionName,
         impact: impactDescription
       })
-    }).catch(err => console.error("Failed to log action:", err));
+    })
+      .then(() => loadLiveData())
+      .catch(err => console.error("Failed to log action:", err));
 
     setSystemLogs(prev => [`Safety Agent: Executive Command: "${actionName}"`, ...prev]);
     
@@ -849,6 +855,11 @@ export default function App() {
                 </div>
 
               </div>
+              
+              {/* Emergency Dispatch Control Center */}
+              <section>
+                <DispatchControl actions={actionHistory} onResolve={loadLiveData} />
+              </section>
 
               {/* What-if simulator & Senate Chamber Grid */}
               <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">

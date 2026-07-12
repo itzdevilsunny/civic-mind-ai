@@ -3,6 +3,7 @@ import json
 import uuid
 import asyncio
 import sqlite3
+import time
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -100,9 +101,17 @@ def init_db():
             id TEXT PRIMARY KEY,
             action_name TEXT NOT NULL,
             impact TEXT,
+            stage INTEGER DEFAULT 1,
+            status TEXT DEFAULT 'Alert Received',
             triggered_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
         );
         """)
+        cursor.execute("PRAGMA table_info(action_history)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "stage" not in columns:
+            cursor.execute("ALTER TABLE action_history ADD COLUMN stage INTEGER DEFAULT 1")
+        if "status" not in columns:
+            cursor.execute("ALTER TABLE action_history ADD COLUMN status TEXT DEFAULT 'Alert Received'")
         
         # Seed initial tickets if empty
         cursor.execute("SELECT COUNT(*) FROM tickets")
@@ -193,10 +202,14 @@ def db_update_ticket(ticket_id: str, updates: dict):
 
 def db_log_action(action: dict):
     global USE_SUPABASE
+    stage = action.get("stage", 1)
+    status = action.get("status", "Alert Received")
+    
     if USE_SUPABASE and supabase_client:
         try:
-            supabase_client.table("action_history").insert(action).execute()
-            return action
+            full_action = {**action, "stage": stage, "status": status}
+            supabase_client.table("action_history").insert(full_action).execute()
+            return full_action
         except Exception as e:
             logger.error(f"Supabase action log error: {e}. Falling back to SQLite.")
             USE_SUPABASE = False
@@ -205,12 +218,12 @@ def db_log_action(action: dict):
         conn = sqlite3.connect(SQLITE_PATH)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO action_history (id, action_name, impact, triggered_at) VALUES (?, ?, ?, ?)",
-            (action["id"], action["action_name"], action["impact"], action["triggered_at"])
+            "INSERT INTO action_history (id, action_name, impact, stage, status, triggered_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (action["id"], action["action_name"], action["impact"], stage, status, action["triggered_at"])
         )
         conn.commit()
         conn.close()
-        return action
+        return {**action, "stage": stage, "status": status}
     except Exception as e:
         logger.error(f"SQLite action log error: {e}")
         return action
@@ -646,6 +659,13 @@ def get_tickets():
     """
     return db_get_tickets()
 
+@app.get("/api/actions")
+def get_actions():
+    """
+    Returns the action history log from the database.
+    """
+    return db_get_action_history()
+
 @app.post("/api/tickets")
 def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks):
     """
@@ -716,20 +736,79 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
 
     return new_ticket
 
+def simulate_dispatch_pipeline(action_id: str):
+    """
+    Simulates real-time dispatch progress stepper by incrementing action stages.
+    """
+    stages = [
+        (1, "Alert Received"),
+        (2, "Units En Route"),
+        (3, "Responding On-Site"),
+        (4, "Post-Incident Cleanup"),
+        (5, "Resolved")
+    ]
+    for stage, status in stages[1:]:
+        time.sleep(10)
+        try:
+            conn = sqlite3.connect(SQLITE_PATH)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT stage FROM action_history WHERE id = ?", (action_id,))
+            row = cursor.fetchone()
+            if not row or row["stage"] >= 5:
+                conn.close()
+                break
+                
+            cursor.execute(
+                "UPDATE action_history SET stage = ?, status = ? WHERE id = ?",
+                (stage, status, action_id)
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Dispatch pipeline simulation error for {action_id}: {e}")
+            break
+
+class ResolveActionRequest(BaseModel):
+    action_id: str
+
+@app.post("/api/action/resolve")
+def resolve_action(payload: ResolveActionRequest):
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE action_history SET stage = 5, status = 'Resolved' WHERE id = ?",
+            (payload.action_id,)
+        )
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": "Action resolved successfully."}
+    except Exception as e:
+        logger.error(f"Failed to resolve action: {e}")
+        return {"status": "error", "message": str(e)}
+
 @app.post("/api/action")
-def log_action(action: ActionExecute):
+def log_action(action: ActionExecute, background_tasks: BackgroundTasks):
     """
     Logs dispatches and parameters of executive decisions in the database.
     """
     from datetime import datetime, timezone
+    action_id = str(uuid.uuid4())
     new_action = {
-        "id": str(uuid.uuid4()),
+        "id": action_id,
         "action_name": action.action_name,
         "impact": action.impact,
+        "stage": 1,
+        "status": "Alert Received",
         "triggered_at": datetime.now(timezone.utc).isoformat()
     }
     db_log_action(new_action)
-    return {"status": "dispatched", "action": action.action_name}
+    
+    # Start the background task to simulate dispatch stepper
+    background_tasks.add_task(simulate_dispatch_pipeline, action_id)
+    
+    return {"status": "dispatched", "action": action.action_name, "id": action_id}
 
 # --- Event-Source Stream (SSE) for AI Copilot ---
 
