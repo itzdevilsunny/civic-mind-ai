@@ -14,7 +14,8 @@ import {
   Wind,
   Radio,
   Volume2,
-  FileDown
+  FileDown,
+  HeartPulse
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -25,6 +26,7 @@ import MultiAgentStatus from './components/MultiAgentStatus';
 import WorkflowTracker from './components/WorkflowTracker';
 import SenateChamber from './components/SenateChamber';
 import DispatchControl from './components/DispatchControl';
+import SentimentPulse from './components/SentimentPulse';
 
 const initialTickets = [
   {
@@ -376,6 +378,11 @@ export default function App() {
           <li className={`menu-item ${activeTab === 'others' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('others')}>
               <Users className="w-4 h-4" /> Actuators & Analytics
+            </button>
+          </li>
+          <li className={`menu-item ${activeTab === 'pulse' ? 'active' : ''}`}>
+            <button onClick={() => setActiveTab('pulse')}>
+              <HeartPulse className="w-4 h-4" /> Sentiment Pulse
             </button>
           </li>
         </ul>
@@ -911,6 +918,13 @@ export default function App() {
                   onSelectTicket={(t) => setSystemLogs(prev => [`Tracing complaint LND ID ${t.id}`, ...prev])}
                 />
               </section>
+            </div>
+          )}
+
+          {/* TAB 7: CITIZEN SENTIMENT & SOCIAL PULSE */}
+          {activeTab === 'pulse' && (
+            <div className="flex flex-col gap-0">
+              <SentimentPulse />
             </div>
           )}
 
