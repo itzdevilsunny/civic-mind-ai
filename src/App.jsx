@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   Building2, 
@@ -11,7 +11,9 @@ import {
   FileText,
   CloudSun,
   Camera,
-  Wind
+  Wind,
+  Radio,
+  Volume2
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -65,6 +67,63 @@ export default function App() {
   const [senatePolicy, setSenatePolicy] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Voice Briefing States & Handlers
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const synthRef = useRef(window.speechSynthesis);
+  const utteranceRef = useRef(null);
+
+  const toggleVoiceBriefing = () => {
+    if (isSpeaking) {
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+      setIsSpeaking(false);
+      return;
+    }
+
+    setSystemLogs(prev => [`Citizen Agent: Initiating AI Voice Briefing generator...`, ...prev]);
+    fetch('/api/briefing/generate')
+      .then(res => res.json())
+      .then(data => {
+        const script = data.briefing;
+        setSystemLogs(prev => [`Citizen Agent: AI Operational voice briefing ready.`, ...prev]);
+
+        if (synthRef.current) {
+          synthRef.current.cancel();
+          const utterance = new SpeechSynthesisUtterance(script);
+          const voices = synthRef.current.getVoices();
+          const enVoice = voices.find(v => v.lang.includes('GB') || v.lang.includes('EN') || v.name.includes('Google'));
+          if (enVoice) {
+            utterance.voice = enVoice;
+          }
+          utterance.rate = 0.95;
+
+          utterance.onend = () => {
+            setIsSpeaking(false);
+          };
+          utterance.onerror = () => {
+            setIsSpeaking(false);
+          };
+
+          utteranceRef.current = utterance;
+          setIsSpeaking(true);
+          synthRef.current.speak(utterance);
+        }
+      })
+      .catch(err => {
+        console.error("Voice briefing failed:", err);
+        setSystemLogs(prev => [`System Error: Failed to generate audio briefing script.`, ...prev]);
+      });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+    };
+  }, []);
+
   // Form State
   const [complaintForm, setComplaintForm] = useState({
     title: '',
@@ -344,9 +403,28 @@ export default function App() {
             <span className="text-xs text-slate-500 font-semibold font-mono">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </span>
-            <div className="flex items-center gap-1.5">
-              <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
-              <span className="text-[10px] font-bold text-slate-450 uppercase">{isBackendOnline ? 'API Sync Live' : 'Fallback Sandbox'}</span>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={toggleVoiceBriefing}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold font-sans transition-all duration-300 ${
+                  isSpeaking 
+                    ? 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-pulse'
+                    : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300'
+                }`}
+                style={{ cursor: 'pointer' }}
+              >
+                {isSpeaking ? (
+                  <Radio className="w-3.5 h-3.5 text-rose-500 animate-pulse" />
+                ) : (
+                  <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
+                )}
+                <span>{isSpeaking ? "Stop Briefing" : "Play Voice Briefing"}</span>
+              </button>
+              
+              <div className="flex items-center gap-1.5">
+                <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
+                <span className="text-[10px] font-bold text-slate-450 uppercase">{isBackendOnline ? 'API Sync Live' : 'Fallback Sandbox'}</span>
+              </div>
             </div>
           </div>
         </header>

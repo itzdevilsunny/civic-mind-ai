@@ -1089,6 +1089,61 @@ def run_senate_debate(payload: SimulationRequest):
             
     return math_debate
 
+@app.get("/api/briefing/generate")
+def generate_audio_briefing():
+    """
+    Compiles live city context and uses Gemini 2.5 to generate a 3-sentence
+    newscaster-style audio briefing summary.
+    """
+    try:
+        weather = get_live_weather()
+        temp = weather.get("current", {}).get("temperature_2m", 16)
+        rain = weather.get("current", {}).get("precipitation", 0)
+    except:
+        temp, rain = 16, 0
+
+    try:
+        aqi_data = get_live_aqi()
+        pm25 = aqi_data.get("current", {}).get("pm2_5", 8)
+    except:
+        pm25 = 8
+
+    try:
+        active_tickets = len([t for t in db_get_tickets() if t["status"] != "Resolved"])
+    except:
+        active_tickets = 0
+
+    try:
+        transport = get_live_transport()
+        disrupted = len([t for t in transport if "Good" not in t.get("lineStatuses", [{}])[0].get("statusSeverityDescription", "")])
+    except:
+        disrupted = 0
+
+    fallback_text = f"Good morning, administrator. Here is your daily London operational briefing. The weather is currently {temp} degrees Celsius with {rain} millimeters of precipitation. Air quality PM2 point 5 stands at {pm25} micrograms per cubic meter. There are currently {active_tickets} active citizen incidents in the queue, and {disrupted} tube lines reporting service disruptions. All municipal systems are operating within normal tolerances."
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            prompt = f"""
+            You are the London Municipal Audio Dispatch broadcaster.
+            Generate a concise, professional, newscaster-style spoken briefing script (exactly 3 sentences, no markdown, no headings) based on the following stats:
+            - Temperature: {temp}°C
+            - Rain: {rain}mm
+            - Air Quality PM2.5: {pm25} µg/m³
+            - Active Citizen Incidents: {active_tickets}
+            - Disrupted Tube Lines: {disrupted}
+            
+            The script should be highly readable, conversational, and direct, suitable for text-to-speech. Do not include any brackets, bullets, or emojis. Write out decimal points like 'point 5' or keep it clean for speech.
+            """
+            response = model.generate_content(prompt)
+            text = response.text.strip().replace("*", "").replace("#", "")
+            if len(text) > 50:
+                return {"briefing": text}
+        except Exception as e:
+            logger.error(f"Gemini briefing generation failed: {e}. Using template fallback.", exc_info=True)
+
+    return {"briefing": fallback_text}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8004, reload=True)
