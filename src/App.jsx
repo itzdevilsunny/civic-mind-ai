@@ -158,7 +158,7 @@ export default function App() {
   const [liveAqi, setLiveAqi] = useState(null);
   const [liveTransport, setLiveTransport] = useState([]);
   const [liveMarket, setLiveMarket] = useState(null);
-  const [liveNews, setLiveNews] = useState([]);
+  const [liveNews, setLiveNews] = useState({ channel: '', channel_url: '', articles: [] });
   const [tickets, setTickets] = useState(initialTickets);
   const [telemetry, setTelemetry] = useState([]);
   const [senatePolicy, setSenatePolicy] = useState(null);
@@ -287,7 +287,7 @@ export default function App() {
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
       if (market) setLiveMarket(market);
-      if (news && news.length > 0) setLiveNews(news);
+      if (news && news.articles && news.articles.length > 0) setLiveNews(news);
       if (telemetryData && telemetryData.length > 0) setTelemetry(telemetryData);
       if (actionsData) setActionHistory(actionsData);
       if (aqiForecastData) setAqiForecast(aqiForecastData);
@@ -1458,34 +1458,63 @@ export default function App() {
             </div>
           )}
 
-          {/* TAB 5: NEWS & MEDIA */}
           {activeTab === 'news' && (
             <div className="flex flex-col gap-6">
               <div className="card">
-                <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-6">
-                  <h3 className="card-title"><FileText className="w-5 h-5 text-indigo-650" /> {cityInfo?.label || 'City'} Local RSS News Channel</h3>
-                  <span className="card-subtitle">Real-time local feed fetched directly from local RSS news source</span>
+                <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="card-title"><FileText className="w-5 h-5 text-indigo-650" /> {cityInfo?.label || 'City'} Live News</h3>
+                    {liveNews.channel ? (
+                      <span className="card-subtitle">
+                        Live feed via{' '}
+                        <a
+                          href={liveNews.channel_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold text-indigo-600 hover:underline"
+                        >
+                          {liveNews.channel}
+                        </a>
+                      </span>
+                    ) : (
+                      <span className="card-subtitle">Real-time local RSS news feed</span>
+                    )}
+                  </div>
+                  {liveNews.channel && (
+                    <a
+                      href={liveNews.channel_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 text-[11px] font-bold border border-indigo-100 dark:border-indigo-800 hover:bg-indigo-100 transition-colors flex-shrink-0"
+                    >
+                      📡 {liveNews.channel} ↗
+                    </a>
+                  )}
                 </div>
-                
-                {liveNews && liveNews.length > 0 ? (
+
+                {liveNews.articles && liveNews.articles.length > 0 ? (
                   <div className="news-grid">
-                    {liveNews.slice(0, 8).map((art, idx) => (
+                    {liveNews.articles.slice(0, 8).map((art, idx) => (
                       <div key={idx} className="news-card">
-                        <div className="news-card-img">
-                          <img src={`https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=400&q=80`} alt="News" />
-                        </div>
                         <div className="news-card-body">
                           <a href={art.link} target="_blank" rel="noopener noreferrer" className="news-card-title hover:text-indigo-650 transition-colors">
                             {art.title}
                           </a>
-                          <p className="news-card-desc line-clamp-3">{art.description}</p>
-                          <div className="news-card-footer">{art.pubDate}</div>
+                          {art.description && (
+                            <p className="news-card-desc line-clamp-3">{art.description}</p>
+                          )}
+                          <div className="news-card-footer flex items-center justify-between gap-2">
+                            <span>{art.pubDate}</span>
+                            {art.source && (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-semibold truncate max-w-[120px]">{art.source}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-xs text-slate-400">Loading BBC News articles...</div>
+                  <div className="text-xs text-slate-400">Loading {cityInfo?.label || 'city'} news...</div>
                 )}
               </div>
             </div>
