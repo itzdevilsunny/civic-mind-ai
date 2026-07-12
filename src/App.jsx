@@ -13,7 +13,8 @@ import {
   Camera,
   Wind,
   Radio,
-  Volume2
+  Volume2,
+  FileDown
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -116,6 +117,16 @@ export default function App() {
         console.error("Voice briefing failed:", err);
         setSystemLogs(prev => [`System Error: Failed to generate audio briefing script.`, ...prev]);
       });
+  };
+
+  const downloadAuditPdf = () => {
+    setSystemLogs(prev => [`Citizen Agent: Generating and exporting municipal audit PDF...`, ...prev]);
+    const link = document.createElement('a');
+    link.href = '/api/audit/pdf';
+    link.download = 'london_municipal_audit_report.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   useEffect(() => {
@@ -378,6 +389,15 @@ export default function App() {
           >
             {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
             <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+
+          <button 
+            onClick={downloadAuditPdf}
+            className="btn-3d flex items-center justify-center gap-2 text-white border border-indigo-700/50 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 transition-all duration-300 w-full"
+            style={{ fontSize: '11px', fontWeight: '600', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            <FileDown className="w-4 h-4 animate-bounce" />
+            <span>Export Audit PDF</span>
           </button>
         </div>
       </aside>

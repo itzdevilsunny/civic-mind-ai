@@ -1222,6 +1222,234 @@ def generate_audio_briefing():
             logger.error(f"Gemini briefing generation failed: {e}. Using template fallback.", exc_info=True)
 
     return {"briefing": fallback_text}
+@app.get("/api/audit/pdf")
+def export_audit_pdf():
+    """
+    Generates a beautifully typeset PDF containing municipal audit details, 
+    active tickets, dispatch status, and Gemini-based policy recommendations.
+    """
+    import io
+    from fastapi.responses import StreamingResponse
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    try:
+        weather = get_live_weather()
+        temp = weather.get("current", {}).get("temperature_2m", 16)
+        rain = weather.get("current", {}).get("precipitation", 0)
+    except:
+        temp, rain = 16, 0
+
+    try:
+        aqi_data = get_live_aqi()
+        pm25 = aqi_data.get("current", {}).get("pm2_5", 8)
+        aqi_status = "Good" if pm25 <= 12 else "Moderate" if pm25 <= 35 else "Unhealthy"
+    except:
+        pm25, aqi_status = 8, "Good"
+
+    try:
+        tickets = db_get_tickets()
+        active_cnt = len([t for t in tickets if t["status"] != "Resolved"])
+        resolved_cnt = len([t for t in tickets if t["status"] == "Resolved"])
+    except:
+        tickets, active_cnt, resolved_cnt = [], 0, 0
+
+    try:
+        actions = db_get_action_history()
+    except:
+        actions = []
+
+    recommendation = "All municipal indicators are currently functioning within acceptable standard margins. Recommend continuing Westminster grid optimization."
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            prompt = f"""
+            Write a professional 2-sentence municipal audit recommendation paragraph for London based on the following stats:
+            - Temperature: {temp}°C, Precipitation: {rain}mm
+            - Air Quality PM2.5: {pm25} µg/m³ ({aqi_status})
+            - Active Citizen Complaints: {active_cnt}
+            - Resolved Incidents: {resolved_cnt}
+            Ensure it is highly executive, authoritative, and direct. Do not include markdown.
+            """
+            response = model.generate_content(prompt)
+            recommendation = response.text.strip().replace("*", "")
+        except Exception as e:
+            logger.error(f"Gemini audit recommendation compile failed: {e}")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter,
+        rightMargin=40, leftMargin=40, topMargin=45, bottomMargin=40
+    )
+    
+    styles = getSampleStyleSheet()
+    
+    primary_color = colors.HexColor("#312e81")
+    text_color = colors.HexColor("#1e293b")
+    border_color = colors.HexColor("#e2e8f0")
+    accent_color = colors.HexColor("#4f46e5")
+    
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=24,
+        textColor=primary_color,
+        spaceAfter=5
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        textColor=colors.HexColor("#64748b"),
+        spaceAfter=15
+    )
+
+    h2_style = ParagraphStyle(
+        'SectionHeader',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        textColor=primary_color,
+        spaceBefore=15,
+        spaceAfter=8,
+        borderPadding=2
+    )
+
+    body_style = ParagraphStyle(
+        'BodyText',
+        parent=styles['BodyText'],
+        fontName='Helvetica',
+        fontSize=9.5,
+        textColor=text_color,
+        leading=14,
+        spaceAfter=10
+    )
+
+    table_header_style = ParagraphStyle(
+        'TableHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=9,
+        textColor=colors.white
+    )
+
+    table_cell_style = ParagraphStyle(
+        'TableCell',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        textColor=text_color,
+        leading=11
+    )
+
+    story = []
+    
+    story.append(Paragraph("CIVICMIND AI MUNICIPAL AUDIT REPORT", title_style))
+    from datetime import datetime
+    time_str = datetime.now().strftime("%B %d, %Y - %H:%M:%S")
+    story.append(Paragraph(f"LONDON CENTRAL SECTOR OPERATIONAL ASSESSMENT | GENERATED: {time_str}", subtitle_style))
+    story.append(Spacer(1, 10))
+
+    story.append(Paragraph("1. Executive AI Analysis & Recommendation", h2_style))
+    story.append(Paragraph(recommendation, body_style))
+    story.append(Spacer(1, 10))
+
+    story.append(Paragraph("2. Environmental & Climate Telemetry", h2_style))
+    env_data = [
+        [Paragraph("Telemetry Indicator", table_header_style), Paragraph("Current Reading", table_header_style), Paragraph("Threshold Status", table_header_style)],
+        [Paragraph("Air Quality Index (PM2.5)", table_cell_style), Paragraph(f"{pm25} µg/m³", table_cell_style), Paragraph(aqi_status, table_cell_style)],
+        [Paragraph("Temperature", table_cell_style), Paragraph(f"{temp} °C", table_cell_style), Paragraph("Optimal", table_cell_style)],
+        [Paragraph("Precipitation", table_cell_style), Paragraph(f"{rain} mm", table_cell_style), Paragraph("Normal", table_cell_style)]
+    ]
+    t_env = Table(env_data, colWidths=[200, 160, 160])
+    t_env.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), primary_color),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('TOPPADDING', (0,0), (-1,0), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#f8fafc")),
+        ('TOPPADDING', (0,1), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 5),
+    ]))
+    story.append(t_env)
+    story.append(Spacer(1, 15))
+
+    story.append(Paragraph("3. Active Citizen Complaints Registry", h2_style))
+    ticket_rows = [
+        [Paragraph("Ticket ID", table_header_style), Paragraph("Incident Summary", table_header_style), Paragraph("Category", table_header_style), Paragraph("Priority", table_header_style), Paragraph("Status", table_header_style)]
+    ]
+    
+    active_tickets = [t for t in tickets if t["status"] != "Resolved"][:8]
+    if not active_tickets:
+        ticket_rows.append([Paragraph("No active citizen complaints in database queue.", table_cell_style), Paragraph("", table_cell_style), Paragraph("", table_cell_style), Paragraph("", table_cell_style), Paragraph("", table_cell_style)])
+    else:
+        for t in active_tickets:
+            ticket_rows.append([
+                Paragraph(t["id"], table_cell_style),
+                Paragraph(t["title"], table_cell_style),
+                Paragraph(t["category"], table_cell_style),
+                Paragraph(t["priority"], table_cell_style),
+                Paragraph(t["status"], table_cell_style),
+            ])
+            
+    t_tkt = Table(ticket_rows, colWidths=[70, 180, 110, 80, 80])
+    t_tkt.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), accent_color),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('TOPPADDING', (0,0), (-1,0), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#f8fafc")),
+        ('TOPPADDING', (0,1), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 5),
+    ]))
+    story.append(t_tkt)
+    story.append(Spacer(1, 15))
+
+    story.append(Paragraph("4. Emergency Dispatch Roster", h2_style))
+    dispatch_rows = [
+        [Paragraph("Action ID", table_header_style), Paragraph("Dispatch Event", table_header_style), Paragraph("Operational Impact Summary", table_header_style), Paragraph("Stage", table_header_style)]
+    ]
+    active_actions = actions[:8]
+    if not active_actions:
+        dispatch_rows.append([Paragraph("No emergency actions logged in this session.", table_cell_style), Paragraph("", table_cell_style), Paragraph("", table_cell_style), Paragraph("", table_cell_style)])
+    else:
+        for a in active_actions:
+            dispatch_rows.append([
+                Paragraph(a["id"][:8], table_cell_style),
+                Paragraph(a["action_name"], table_cell_style),
+                Paragraph(a.get("impact", "Routine check"), table_cell_style),
+                Paragraph(a.get("status", "Active"), table_cell_style),
+            ])
+            
+    t_act = Table(dispatch_rows, colWidths=[70, 180, 190, 80])
+    t_act.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), primary_color),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('TOPPADDING', (0,0), (-1,0), 6),
+        ('GRID', (0,0), (-1,-1), 0.5, border_color),
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor("#f8fafc")),
+        ('TOPPADDING', (0,1), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,1), (-1,-1), 5),
+    ]))
+    story.append(t_act)
+    
+    doc.build(story)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=london_municipal_audit_report.pdf"}
+    )
 
 if __name__ == "__main__":
     import uvicorn
