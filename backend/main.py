@@ -1823,6 +1823,192 @@ Requirements:
         }
 
 
+# ─────────────────────────────────────────────────────────
+# FEATURE 13: CITY BUDGET & FINANCIAL INTELLIGENCE
+# ─────────────────────────────────────────────────────────
+
+# Department budget allocations (£M annually — London borough scale)
+DEPT_BUDGETS = {
+    "Transport for London":        {"annual": 4800, "color": "#6366f1"},
+    "Thames Water":                {"annual": 1200, "color": "#0ea5e9"},
+    "Thames Water & Power Grid":   {"annual": 1200, "color": "#0ea5e9"},
+    "Power Grid Commission":       {"annual": 980,  "color": "#f59e0b"},
+    "Metropolitan Police Service": {"annual": 3200, "color": "#ef4444"},
+    "London Environment Agency":   {"annual": 640,  "color": "#10b981"},
+    "London Borough Services":     {"annual": 890,  "color": "#8b5cf6"},
+    "Auto-Assigned":               {"annual": 500,  "color": "#94a3b8"},
+}
+
+# Estimated cost per incident by priority (£K)
+INCIDENT_COST = {"Critical": 85, "High": 42, "Medium": 18, "Low": 6}
+
+# Resolution time targets by priority (hours)
+SLA_TARGETS = {"Critical": 4, "High": 12, "Medium": 48, "Low": 168}
+
+@app.get("/api/budget/intelligence")
+def get_budget_intelligence():
+    """
+    Compute real-time city budget intelligence from live ticket/action data.
+    Returns departmental spend analysis, budget health scores, cost projections,
+    monthly trend data and Gemini AI optimization recommendations.
+    """
+    tickets = db_get_tickets()
+    actions = db_get_action_history()
+
+    # ── Department spend analysis from live ticket data ──
+    dept_spend = {}
+    dept_tickets = {}
+    dept_resolved = {}
+    total_incident_cost = 0
+
+    for t in tickets:
+        dept = t.get("department", "Auto-Assigned")
+        priority = t.get("priority", "Medium")
+        status = t.get("status", "Pending")
+        cost = INCIDENT_COST.get(priority, 18)
+
+        if dept not in dept_spend:
+            dept_spend[dept] = 0
+            dept_tickets[dept] = 0
+            dept_resolved[dept] = 0
+
+        dept_spend[dept] += cost
+        dept_tickets[dept] += 1
+        if status in ["Resolved"]:
+            dept_resolved[dept] += 1
+
+        total_incident_cost += cost
+
+    # ── Dispatch costs from action history ──
+    dispatch_cost = len(actions) * 28  # avg £28K per dispatch
+
+    # ── Build department breakdown ──
+    departments = []
+    for dept, budget_info in DEPT_BUDGETS.items():
+        annual_budget = budget_info["annual"]
+        spend_k = dept_spend.get(dept, 0) + (dispatch_cost // max(1, len(DEPT_BUDGETS)))
+        budget_m = annual_budget
+        spend_pct = min(100, round((spend_k / (annual_budget * 1000)) * 100, 1))
+        ticket_count = dept_tickets.get(dept, 0)
+        resolved = dept_resolved.get(dept, 0)
+        efficiency = round((resolved / max(1, ticket_count)) * 100)
+
+        departments.append({
+            "name": dept,
+            "annual_budget_m": budget_m,
+            "current_spend_k": spend_k,
+            "budget_used_pct": spend_pct,
+            "tickets": ticket_count,
+            "resolved": resolved,
+            "efficiency_pct": efficiency,
+            "color": budget_info["color"],
+            "status": "Critical" if spend_pct > 85 else "Warning" if spend_pct > 65 else "Healthy",
+        })
+
+    # Sort by annual budget descending
+    departments.sort(key=lambda x: x["annual_budget_m"], reverse=True)
+
+    # ── Monthly spend trend (simulated from ticket data with real anchoring) ──
+    import calendar
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]
+    base_monthly = (total_incident_cost + dispatch_cost) / max(1, len(months))
+    rng = __import__("random").Random(42)
+    monthly_spend = [round(base_monthly * rng.uniform(0.75, 1.35)) for _ in months]
+    monthly_spend[-1] = round(total_incident_cost + dispatch_cost)  # current month = real data
+
+    # ── Budget health score (0-100) ──
+    avg_efficiency = sum(d["efficiency_pct"] for d in departments) / max(1, len(departments))
+    critical_depts = sum(1 for d in departments if d["status"] == "Critical")
+    health_score = max(20, min(95, round(70 + avg_efficiency * 0.2 - critical_depts * 15)))
+
+    # ── Total budget overview ──
+    total_annual_budget = sum(info["annual"] for info in DEPT_BUDGETS.values())
+    total_spent_ytd = sum(d["current_spend_k"] for d in departments) / 1000  # to £M
+    ytd_pct = round((total_spent_ytd / total_annual_budget) * 100, 1)
+
+    # ── Cost per category breakdown ──
+    category_costs = {}
+    for t in tickets:
+        cat = t.get("category", "Other")
+        priority = t.get("priority", "Medium")
+        cost = INCIDENT_COST.get(priority, 18)
+        if cat not in category_costs:
+            category_costs[cat] = {"cost": 0, "count": 0}
+        category_costs[cat]["cost"] += cost
+        category_costs[cat]["count"] += 1
+
+    category_breakdown = [
+        {"category": cat, "cost_k": data["cost"], "tickets": data["count"]}
+        for cat, data in sorted(category_costs.items(), key=lambda x: x[1]["cost"], reverse=True)
+    ]
+
+    # ── Gemini AI optimization recommendations ──
+    prompt = f"""You are a London municipal CFO AI advisor. Analyze this city budget data and provide financial optimization recommendations.
+
+Budget Health Score: {health_score}/100
+Total Annual Budget: £{total_annual_budget:,}M
+YTD Spend: £{round(total_spent_ytd, 1)}M ({ytd_pct}% of annual)
+Total Incidents: {len(tickets)}
+Total Dispatches: {len(actions)}
+Average Efficiency: {round(avg_efficiency)}%
+Critical Budget Depts: {critical_depts}
+
+Department Summary:
+{chr(10).join(f"- {d['name']}: £{d['annual_budget_m']}M budget, {d['budget_used_pct']}% used, {d['efficiency_pct']}% efficiency" for d in departments[:5])}
+
+Provide a JSON response with this exact structure:
+{{
+  "financial_summary": "2-sentence executive summary of budget health",
+  "risk_level": "Low|Medium|High|Critical",
+  "savings_potential_m": <number, estimated £M that could be saved>,
+  "recommendations": [
+    {{"title": "...", "description": "...", "impact_m": <number>, "priority": "High|Medium|Low", "dept": "..."}}
+  ],
+  "forecast_alert": "1-sentence forward-looking financial alert"
+}}
+Provide exactly 3 recommendations. Be specific and use real London budget figures. Only return JSON, no markdown."""
+
+    try:
+        import google.generativeai as genai
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(temperature=0.2, max_output_tokens=1024)
+        )
+        raw = response.text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        ai_analysis = json.loads(raw.strip())
+    except Exception as e:
+        logger.warning(f"/api/budget/intelligence Gemini error (using fallback): {e}")
+        ai_analysis = {
+            "financial_summary": f"London city budget is at {ytd_pct}% YTD utilization with a health score of {health_score}/100. {critical_depts} departments show elevated spend rates requiring attention.",
+            "risk_level": "High" if critical_depts > 2 else "Medium" if ytd_pct > 60 else "Low",
+            "savings_potential_m": round(total_spent_ytd * 0.12, 1),
+            "recommendations": [
+                {"title": "Preventive Infrastructure Programme", "description": "Shift 30% of reactive road maintenance spend to scheduled inspections to reduce emergency call-outs by an estimated 40%.", "impact_m": round(total_spent_ytd * 0.08, 1), "priority": "High", "dept": "Transport for London"},
+                {"title": "Shared Dispatch Coordination Hub", "description": "Consolidate emergency dispatch coordination between Police, Fire, and Ambulance services to reduce duplicate crew deployments.", "impact_m": round(dispatch_cost * 0.15 / 1000, 1), "priority": "Medium", "dept": "Metropolitan Police Service"},
+                {"title": "Smart Utilities Monitoring", "description": "Deploy IoT leak detection sensors at 50 high-risk junctions to reduce emergency water main repairs by 25%.", "impact_m": round(total_spent_ytd * 0.05, 1), "priority": "Medium", "dept": "Thames Water"},
+            ],
+            "forecast_alert": f"At current spend velocity, total incident response budget will exceed {round(ytd_pct + 8)}% of annual allocation by Q3. Proactive intervention recommended."
+        }
+
+    return {
+        "health_score": health_score,
+        "total_annual_budget_m": total_annual_budget,
+        "total_spent_ytd_m": round(total_spent_ytd, 2),
+        "ytd_percentage": ytd_pct,
+        "total_incident_cost_k": total_incident_cost,
+        "total_dispatch_cost_k": dispatch_cost,
+        "departments": departments,
+        "monthly_trend": {"months": months, "spend_k": monthly_spend},
+        "category_breakdown": category_breakdown,
+        "ai_analysis": ai_analysis,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8004, reload=True)

@@ -15,7 +15,8 @@ import {
   Radio,
   Volume2,
   FileDown,
-  HeartPulse
+  HeartPulse,
+  PoundSterling
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -27,6 +28,7 @@ import WorkflowTracker from './components/WorkflowTracker';
 import SenateChamber from './components/SenateChamber';
 import DispatchControl from './components/DispatchControl';
 import SentimentPulse from './components/SentimentPulse';
+import CityBudget from './components/CityBudget';
 
 const initialTickets = [
   {
@@ -391,6 +393,11 @@ export default function App() {
           <li className={`menu-item ${activeTab === 'pulse' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('pulse')}>
               <HeartPulse className="w-4 h-4" /> Sentiment Pulse
+            </button>
+          </li>
+          <li className={`menu-item ${activeTab === 'budget' ? 'active' : ''}`}>
+            <button onClick={() => setActiveTab('budget')}>
+              <PoundSterling className="w-4 h-4" /> Budget Intelligence
             </button>
           </li>
         </ul>
@@ -951,6 +958,13 @@ export default function App() {
           {activeTab === 'pulse' && (
             <div className="flex flex-col gap-0">
               <SentimentPulse />
+            </div>
+          )}
+
+          {/* TAB 8: CITY BUDGET & FINANCIAL INTELLIGENCE */}
+          {activeTab === 'budget' && (
+            <div className="flex flex-col gap-0">
+              <CityBudget />
             </div>
           )}
 
