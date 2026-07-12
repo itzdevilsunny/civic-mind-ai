@@ -69,6 +69,7 @@ export default function App() {
   const [senatePolicy, setSenatePolicy] = useState(null);
   const [actionHistory, setActionHistory] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [aqiForecast, setAqiForecast] = useState(null);
   
   // Voice Briefing States & Handlers
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -161,8 +162,9 @@ export default function App() {
       fetch('/api/live/news').then(res => res.json()).catch(() => []),
       fetch('/api/tickets').then(res => res.json()).catch(() => null),
       fetch('/api/telemetry').then(res => res.json()).catch(() => []),
-      fetch('/api/actions').then(res => res.json()).catch(() => [])
-    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData]) => {
+      fetch('/api/actions').then(res => res.json()).catch(() => []),
+      fetch('/api/live/aqi/forecast').then(res => res.json()).catch(() => null)
+    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
@@ -170,6 +172,7 @@ export default function App() {
       if (news && news.length > 0) setLiveNews(news);
       if (telemetryData && telemetryData.length > 0) setTelemetry(telemetryData);
       if (actionsData) setActionHistory(actionsData);
+      if (aqiForecastData) setAqiForecast(aqiForecastData);
       if (dbTickets) {
         setTickets(dbTickets);
         setIsBackendOnline(true);
@@ -273,16 +276,21 @@ export default function App() {
   };
 
   const getForecastChart = () => {
-    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const days = aqiForecast?.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const pm25Data = aqiForecast?.pm2_5 || [12, 14, 18, 11, 9, 15, 8];
+    const no2Data = aqiForecast?.nitrogen_dioxide || [24, 28, 32, 21, 18, 30, 22];
+    const pm10Data = aqiForecast?.pm10 || [18, 21, 24, 17, 15, 22, 14];
+
     return {
       tooltip: { trigger: 'axis' },
-      legend: { data: ['PM2.5 Pollution Index', 'Nitrogen Dioxide (µg/m³)'], bottom: 0 },
+      legend: { data: ['PM2.5 (µg/m³)', 'PM10 (µg/m³)', 'Nitrogen Dioxide (µg/m³)'], bottom: 0 },
       grid: { left: '3%', right: '3%', top: '8%', bottom: '12%', containLabel: true },
       xAxis: { type: 'category', data: days },
       yAxis: { type: 'value' },
       series: [
-        { name: 'PM2.5 Pollution Index', type: 'line', data: [12, 14, 18, 11, 9, 15, 8], smooth: true, itemStyle: { color: '#ea580c' } },
-        { name: 'Nitrogen Dioxide (µg/m³)', type: 'bar', data: [24, 28, 32, 21, 18, 30, 22], itemStyle: { color: '#6366f1' } }
+        { name: 'PM2.5 (µg/m³)', type: 'line', data: pm25Data, smooth: true, itemStyle: { color: '#ea580c' } },
+        { name: 'PM10 (µg/m³)', type: 'line', data: pm10Data, smooth: true, itemStyle: { color: '#10b981' } },
+        { name: 'Nitrogen Dioxide (µg/m³)', type: 'bar', data: no2Data, itemStyle: { color: '#6366f1' } }
       ]
     };
   };
