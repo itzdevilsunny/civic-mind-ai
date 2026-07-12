@@ -81,7 +81,7 @@ function PulseGauge({ score }) {
   );
 }
 
-export default function SentimentPulse() {
+export default function SentimentPulse({ isDarkMode }) {
   const [pulse, setPulse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -137,17 +137,27 @@ export default function SentimentPulse() {
   const overall = pulse?.overall_sentiment || {};
   const total = (overall.positive||0)+(overall.neutral||0)+(overall.negative||0)+(overall.urgent||0);
 
-  const card = { background:'linear-gradient(135deg, #0f172a, #1e293b)', border:'1px solid #334155', borderRadius:'16px', padding:'20px' };
+  const isDark = isDarkMode;
+  const card = { 
+    background: isDark ? 'linear-gradient(135deg, #0f172a, #1e293b)' : 'linear-gradient(135deg, #ffffff, #f8fafc)', 
+    border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', 
+    borderRadius: '16px', 
+    padding: '20px',
+    boxShadow: isDark ? 'none' : '0 4px 20px -2px rgba(0, 0, 0, 0.05)'
+  };
+  const headingColor = isDark ? '#f8fafc' : '#1e293b';
+  const textColor = isDark ? '#cbd5e1' : '#475569';
+  const labelColor = isDark ? '#94a3b8' : '#64748b';
 
   return (
     <div style={{ padding:'24px', display:'flex', flexDirection:'column', gap:'24px' }}>
       {/* Header */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
         <div>
-          <h2 style={{ fontSize:'20px', fontWeight:900, color:'#1e293b', display:'flex', alignItems:'center', gap:'8px' }}>
+          <h2 style={{ fontSize:'20px', fontWeight:900, color:headingColor, display:'flex', alignItems:'center', gap:'8px' }}>
             🧠 Citizen Sentiment &amp; Social Pulse
           </h2>
-          <p style={{ fontSize:'11px', color:'#64748b', marginTop:'4px' }}>
+          <p style={{ fontSize:'11px', color:labelColor, marginTop:'4px' }}>
             AI-powered real-time analysis of citizen feedback, district mood, and trending civic issues
             {lastUpdated && <span style={{ marginLeft:'8px', color:'#6366f1' }}>· Updated {lastUpdated}</span>}
           </p>
@@ -163,7 +173,7 @@ export default function SentimentPulse() {
       {loading && !pulse && (
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'80px 0', gap:'16px' }}>
           <div style={{ width:'48px', height:'48px', borderRadius:'50%', border:'4px solid #6366f1', borderTopColor:'transparent', animation:'spin 0.8s linear infinite' }}/>
-          <p style={{ fontSize:'13px', color:'#64748b' }}>Gemini AI is analyzing citizen sentiment data...</p>
+          <p style={{ fontSize:'13px', color:labelColor }}>Gemini AI is analyzing citizen sentiment data...</p>
         </div>
       )}
 
@@ -174,39 +184,39 @@ export default function SentimentPulse() {
             <div style={{ ...card, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'12px' }}>
               <PulseGauge score={pulse.city_pulse_score||0}/>
               <div style={{ textAlign:'center' }}>
-                <p style={{ fontSize:'10px', color:'#64748b', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>AI Assessment</p>
-                <p style={{ fontSize:'11px', color:'#cbd5e1', marginTop:'4px', lineHeight:1.5 }}>{pulse.pulse_summary||'Analyzing...'}</p>
+                <p style={{ fontSize:'10px', color:labelColor, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>AI Assessment</p>
+                <p style={{ fontSize:'11px', color:textColor, marginTop:'4px', lineHeight:1.5 }}>{pulse.pulse_summary||'Analyzing...'}</p>
               </div>
             </div>
             <div style={{ ...card }}>
-              <h3 style={{ fontSize:'11px', fontWeight:700, color:'#cbd5e1', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>Overall Sentiment Distribution</h3>
+              <h3 style={{ fontSize:'11px', fontWeight:700, color:textColor, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>Overall Sentiment Distribution</h3>
               {Object.entries(SENTIMENT_LABELS).map(([key, meta]) => {
                 const cnt = overall[key]||0;
                 const pct = total > 0 ? Math.round((cnt/total)*100) : 0;
                 return (
                   <div key={key} style={{ marginBottom:'10px' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'4px' }}>
-                      <span style={{ color:'#cbd5e1', fontWeight:600 }}>{meta.icon} {meta.label}</span>
+                      <span style={{ color:headingColor, fontWeight:600 }}>{meta.icon} {meta.label}</span>
                       <span style={{ color:meta.color, fontWeight:700 }}>{cnt} ({pct}%)</span>
                     </div>
-                    <div style={{ height:'8px', borderRadius:'4px', background:'#1e293b', overflow:'hidden' }}>
-                      <div style={{ height:'100%', width:`${pct}%`, background:meta.color, borderRadius:'4px', transition:'width 1s', boxShadow:`0 0 6px ${meta.color}80` }}/>
+                    <div style={{ height:'8px', borderRadius:'4px', background: isDark ? '#1e293b' : '#e2e8f0', overflow:'hidden' }}>
+                      <div style={{ height:'100%', width:`${pct}%`, background:meta.metaColor || meta.color, borderRadius:'4px', transition:'width 1s', boxShadow:`0 0 6px ${meta.color}80` }}/>
                     </div>
                   </div>
                 );
               })}
-              <p style={{ fontSize:'10px', color:'#475569', paddingTop:'8px', borderTop:'1px solid #334155', marginTop:'8px' }}>
+              <p style={{ fontSize:'10px', color:labelColor, paddingTop:'8px', borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0', marginTop:'8px' }}>
                 Total reports analyzed: <span style={{ color:'#818cf8', fontWeight:700 }}>{total}</span>
               </p>
             </div>
             <div style={{ ...card }}>
-              <h3 style={{ fontSize:'11px', fontWeight:700, color:'#cbd5e1', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>🔥 Trending Civic Topics</h3>
+              <h3 style={{ fontSize:'11px', fontWeight:700, color:textColor, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>🔥 Trending Civic Topics</h3>
               {(pulse.trending_topics||[]).slice(0,5).map((topic,i) => (
                 <div key={i} style={{ display:'flex', gap:'8px', marginBottom:'10px', alignItems:'flex-start' }}>
-                  <span style={{ fontSize:'11px', color:'#475569', fontWeight:900, width:'16px' }}>#{i+1}</span>
+                  <span style={{ fontSize:'11px', color:labelColor, fontWeight:900, width:'16px' }}>#{i+1}</span>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <p style={{ fontSize:'11px', fontWeight:600, color:'#e2e8f0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{topic.topic}</p>
-                    <p style={{ fontSize:'10px', color:'#475569', marginTop:'2px' }}>{topic.mentions} mentions · {topic.category}</p>
+                    <p style={{ fontSize:'11px', fontWeight:600, color:headingColor, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{topic.topic}</p>
+                    <p style={{ fontSize:'10px', color:labelColor, marginTop:'2px' }}>{topic.mentions} mentions · {topic.category}</p>
                   </div>
                   <span style={{
                     fontSize:'10px', fontWeight:700, padding:'2px 8px', borderRadius:'999px',
@@ -221,18 +231,18 @@ export default function SentimentPulse() {
           {/* Row 2: Radar + Category Bar */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px' }}>
             <div style={card}>
-              <h3 style={{ fontSize:'11px', fontWeight:700, color:'#cbd5e1', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>📡 District Sentiment Radar</h3>
+              <h3 style={{ fontSize:'11px', fontWeight:700, color:textColor, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>📡 District Sentiment Radar</h3>
               {radarOption && <ReactECharts option={radarOption} style={{ height:'240px' }} opts={{ renderer:'svg' }}/>}
             </div>
             <div style={card}>
-              <h3 style={{ fontSize:'11px', fontWeight:700, color:'#cbd5e1', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>📊 Sentiment by Category</h3>
+              <h3 style={{ fontSize:'11px', fontWeight:700, color:textColor, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>📊 Sentiment by Category</h3>
               {catBarOption && <ReactECharts option={catBarOption} style={{ height:'240px' }} opts={{ renderer:'svg' }}/>}
             </div>
           </div>
 
           {/* District Cards */}
           <div>
-            <h3 style={{ fontSize:'11px', fontWeight:700, color:'#64748b', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>🗺️ District Pulse Cards</h3>
+            <h3 style={{ fontSize:'11px', fontWeight:700, color:labelColor, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>🗺️ District Pulse Cards</h3>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'12px' }}>
               {(pulse.districts||[]).map((d,i) => {
                 const color = DISTRICT_COLORS[i%DISTRICT_COLORS.length];
@@ -241,8 +251,8 @@ export default function SentimentPulse() {
                 return (
                   <div key={i} onClick={() => setActiveDistrict(isActive?null:d.name)}
                     style={{
-                      background: isActive?`${color}20`:'linear-gradient(135deg, #0f172a, #1e293b)',
-                      border: isActive?`2px solid ${color}`:'1px solid #334155',
+                      background: isActive?`${color}20`:(isDark ? 'linear-gradient(135deg, #0f172a, #1e293b)' : 'linear-gradient(135deg, #ffffff, #f8fafc)'),
+                      border: isActive?`2px solid ${color}`:(isDark ? '1px solid #334155' : '1px solid #e2e8f0'),
                       borderRadius:'12px', padding:'12px', cursor:'pointer',
                       transition:'all 0.3s', boxShadow: isActive?`0 0 16px ${color}40`:'none',
                     }}>
@@ -250,16 +260,16 @@ export default function SentimentPulse() {
                       <span style={{ fontSize:'9px', fontWeight:900, textTransform:'uppercase', letterSpacing:'0.05em', color }}>{d.name}</span>
                       <span style={{ fontSize:'10px', fontWeight:700, color:sc }}>{d.pulse_score}</span>
                     </div>
-                    <div style={{ height:'6px', borderRadius:'3px', background:'#1e293b', overflow:'hidden', marginBottom:'8px' }}>
+                    <div style={{ height:'6px', borderRadius:'3px', background: isDark ? '#1e293b' : '#e2e8f0', overflow:'hidden', marginBottom:'8px' }}>
                       <div style={{ height:'100%', width:`${d.pulse_score}%`, background:sc, transition:'width 1s' }}/>
                     </div>
                     <p style={{ fontSize:'9px', color:'#34d399' }}>😊 {d.positive_count} positive</p>
                     <p style={{ fontSize:'9px', color:'#fb7185' }}>😠 {d.negative_count} critical</p>
                     <p style={{ fontSize:'9px', color:'#fbbf24' }}>🚨 {d.urgent_count} urgent</p>
                     {isActive && d.top_issue && (
-                      <div style={{ marginTop:'8px', paddingTop:'8px', borderTop:'1px solid #334155' }}>
-                        <p style={{ fontSize:'9px', color:'#475569' }}>Top Issue:</p>
-                        <p style={{ fontSize:'10px', color:'#e2e8f0', fontWeight:600, lineHeight:1.4 }}>{d.top_issue}</p>
+                      <div style={{ marginTop:'8px', paddingTop:'8px', borderTop: isDark ? '1px solid #334155' : '1px solid #e2e8f0' }}>
+                        <p style={{ fontSize:'9px', color:labelColor }}>Top Issue:</p>
+                        <p style={{ fontSize:'10px', color:headingColor, fontWeight:600, lineHeight:1.4 }}>{d.top_issue}</p>
                       </div>
                     )}
                   </div>
@@ -270,21 +280,21 @@ export default function SentimentPulse() {
 
           {/* Keyword Cloud */}
           <div style={card}>
-            <h3 style={{ fontSize:'11px', fontWeight:700, color:'#cbd5e1', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'4px' }}>☁️ Civic Keyword Cloud</h3>
+            <h3 style={{ fontSize:'11px', fontWeight:700, color:textColor, textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'4px' }}>☁️ Civic Keyword Cloud</h3>
             <KeywordCloud keywords={pulse.keyword_cloud||[]}/>
           </div>
 
           {/* AI Recommendations */}
           {pulse.recommendations && pulse.recommendations.length > 0 && (
-            <div style={{ ...card, border:'1px solid #6366f140' }}>
-              <h3 style={{ fontSize:'11px', fontWeight:700, color:'#818cf8', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>🤖 Gemini AI Policy Recommendations</h3>
+            <div style={{ ...card, border: isDark ? '1px solid #6366f140' : '1px solid #6366f160' }}>
+              <h3 style={{ fontSize:'11px', fontWeight:700, color: isDark ? '#818cf8' : '#4f46e5', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'12px' }}>🤖 Gemini AI Policy Recommendations</h3>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
                 {pulse.recommendations.map((rec,i) => (
-                  <div key={i} style={{ display:'flex', gap:'12px', padding:'12px', borderRadius:'12px', background:'#0f172a80' }}>
+                  <div key={i} style={{ display:'flex', gap:'12px', padding:'12px', borderRadius:'12px', background: isDark ? '#0f172a80' : '#f1f5f9' }}>
                     <span style={{ fontSize:'20px' }}>{CATEGORY_ICONS[rec.category]||'📋'}</span>
                     <div>
-                      <p style={{ fontSize:'12px', fontWeight:700, color:'#e2e8f0' }}>{rec.title}</p>
-                      <p style={{ fontSize:'10px', color:'#64748b', marginTop:'2px', lineHeight:1.5 }}>{rec.description}</p>
+                      <p style={{ fontSize:'12px', fontWeight:700, color:headingColor }}>{rec.title}</p>
+                      <p style={{ fontSize:'10px', color:labelColor, marginTop:'2px', lineHeight:1.5 }}>{rec.description}</p>
                       <span style={{
                         display:'inline-block', marginTop:'4px', fontSize:'9px', fontWeight:700, padding:'2px 8px', borderRadius:'999px',
                         color: rec.priority==='High'?'#f43f5e':rec.priority==='Medium'?'#f59e0b':'#10b981',

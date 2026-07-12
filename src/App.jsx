@@ -1449,7 +1449,7 @@ export default function App() {
           {/* TAB 7: CITIZEN SENTIMENT & SOCIAL PULSE */}
           {activeTab === 'pulse' && (
             <div className="flex flex-col gap-0">
-              <SentimentPulse />
+              <SentimentPulse isDarkMode={isDarkMode} />
             </div>
           )}
 

@@ -67,7 +67,7 @@ export default function SenateChamber({ policyParams }) {
 
   // Handle sequential message reveal
   useEffect(() => {
-    if (messages.length === 0) return;
+    if (!messages || messages.length === 0) return;
 
     let index = 0;
     let isCancelled = false;
@@ -75,12 +75,20 @@ export default function SenateChamber({ policyParams }) {
     const showNextMessage = () => {
       if (isCancelled) return;
       if (index < messages.length) {
-        const speaker = messages[index].agent;
+        const currentMsg = messages[index];
+        if (!currentMsg) {
+          setActiveSpeaker(null);
+          return;
+        }
+        const speaker = currentMsg.agent;
         setActiveSpeaker(speaker);
 
         setTimeout(() => {
           if (isCancelled) return;
-          setVisibleMessages(prev => [...prev, messages[index]]);
+          const msgToAppend = messages[index];
+          if (msgToAppend) {
+            setVisibleMessages(prev => [...prev, msgToAppend]);
+          }
           setActiveSpeaker(null);
           index++;
           
@@ -138,7 +146,7 @@ export default function SenateChamber({ policyParams }) {
 
       {/* Debate scroll log */}
       <div className="flex-1 min-h-[300px] max-h-[400px] overflow-y-auto pr-1 flex flex-col gap-3.5 mb-2">
-        {visibleMessages.map((msg, idx) => (
+        {visibleMessages.filter(Boolean).map((msg, idx) => (
           <div 
             key={idx} 
             className={`flex flex-col gap-1.5 border p-3 rounded-xl transition-all duration-300 animate-fade-in ${agentColors[msg.agent] || 'border-slate-200 bg-slate-50'}`}
