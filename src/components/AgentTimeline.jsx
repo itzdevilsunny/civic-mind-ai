@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Network, TrafficCone, Zap, Shield, Users, Download, Filter } from "lucide-react";
 
 const AGENTS = {
@@ -16,7 +16,7 @@ const SEVERITY_STYLES = {
   info:     { bg: "rgba(99,102,241,0.08)", border: "#6366f140", color: "#6366f1", label: "INFO"     },
 };
 
-function generateEvent(weather, aqi, ticketCount) {
+function generateEvent(weather, aqi, ticketCount, cityName = 'City') {
   const now = Date.now();
   const id = `evt-${now}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -25,10 +25,10 @@ function generateEvent(weather, aqi, ticketCount) {
       agent: "Traffic Intelligence Agent",
       severity: "info",
       messages: [
-        "Synchronized signal timing across Westminster corridor. Avg delay reduced by 18%.",
-        `Rerouting buses on Southwark Bridge due to ${ticketCount > 2 ? "active incidents" : "maintenance window"}.`,
+        `Synchronized signal timing across ${cityName} central corridor. Avg delay reduced by 18%.`,
+        `Rerouting buses in ${cityName} due to ${ticketCount > 2 ? "active incidents" : "maintenance window"}.`,
         "Coordinating with Energy Agent on EV charging bay load during peak hours.",
-        "Congestion index updated: current level MODERATE across Central London zones.",
+        `Congestion index updated: current level MODERATE across ${cityName} zones.`,
         "Shared live bus occupancy feed with Citizen Engagement Agent for commuter updates.",
       ],
     },
@@ -36,9 +36,9 @@ function generateEvent(weather, aqi, ticketCount) {
       agent: "Energy Intelligence Agent",
       severity: weather?.condition?.includes("Rain") ? "warning" : "info",
       messages: [
-        `Solar microgrid output at ${Math.round(40 + Math.random() * 45)}% capacity � adjusting grid draw from mains.`,
-        "Load-balancing street lighting across 6 districts post-sunset.",
-        "Detected abnormal draw spike at Waterloo substation. Alerting Public Safety Agent.",
+        `Solar microgrid output at ${Math.round(40 + Math.random() * 45)}% capacity — adjusting grid draw from mains.`,
+        `Load-balancing street lighting across ${cityName} districts post-sunset.`,
+        `Detected abnormal draw spike at ${cityName} substation. Alerting Public Safety Agent.`,
         `Renewable grid mix at ${Math.round(55 + Math.random() * 30)}%. Carbon offset updated.`,
         "Coordinating with Traffic Agent to optimize EV charging schedules for off-peak windows.",
       ],
@@ -47,9 +47,9 @@ function generateEvent(weather, aqi, ticketCount) {
       agent: "Public Safety Agent",
       severity: aqi > 50 ? "critical" : ticketCount > 3 ? "warning" : "info",
       messages: [
-        aqi > 50 ? `AQI breach detected: ${aqi} �g/m� PM2.5. Issuing air quality advisory.` : "AQI within safe limits across all districts.",
-        "Dispatching patrol unit to Lambeth following citizen complaint escalation.",
-        "Coordinating with Energy Agent on Waterloo power anomaly investigation.",
+        aqi > 50 ? `AQI breach detected: ${aqi} µg/m³ PM2.5. Issuing air quality advisory for ${cityName}.` : `AQI within safe limits across all ${cityName} districts.`,
+        `Dispatching patrol unit to ${cityName} zone following citizen complaint escalation.`,
+        `Coordinating with Energy Agent on ${cityName} power anomaly investigation.`,
         `Incident response time averaging ${Math.round(4 + Math.random() * 6)} minutes across active zones.`,
         "Threat level assessed: LOW. Emergency services on standby.",
       ],
@@ -73,19 +73,20 @@ function generateEvent(weather, aqi, ticketCount) {
   return { id, agent: pool.agent, severity: pool.severity, message, ts: now };
 }
 
-export default function AgentTimeline({ isDarkMode, liveWeather, liveAqi, tickets }) {
+export default function AgentTimeline({ isDarkMode, liveWeather, liveAqi, tickets, cityInfo }) {
   const [events, setEvents] = useState([]);
   const [filterAgent, setFilterAgent] = useState("all");
   const topRef = useRef(null);
 
   const aqi = liveAqi?.pm2_5 || 0;
   const ticketCount = tickets?.length || 0;
+  const cityName = cityInfo?.label || 'City';
 
   // Seed initial events
   useEffect(() => {
     const initial = [];
     for (let i = 0; i < 6; i++) {
-      initial.unshift(generateEvent(liveWeather, aqi, ticketCount));
+      initial.unshift(generateEvent(liveWeather, aqi, ticketCount, cityName));
     }
     setEvents(initial);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,7 +95,7 @@ export default function AgentTimeline({ isDarkMode, liveWeather, liveAqi, ticket
   // Auto-generate new events
   useEffect(() => {
     const interval = setInterval(() => {
-      const newEvent = generateEvent(liveWeather, aqi, ticketCount);
+      const newEvent = generateEvent(liveWeather, aqi, ticketCount, cityName);
       setEvents(prev => [newEvent, ...prev].slice(0, 60));
     }, 9000 + Math.random() * 6000);
     return () => clearInterval(interval);

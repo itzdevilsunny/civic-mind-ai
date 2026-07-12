@@ -143,21 +143,21 @@ export default function AICopilot({
     let actions = [];
 
     if (normQuery.includes("traffic") || normQuery.includes("speed") || normQuery.includes("congestion")) {
-      thoughts.push("Scanning Piccadilly and London Bridge sensors...");
-      thoughts.push("Found active traffic nodes. Tower Bridge speed sensor shows congested status.");
+      thoughts.push(`Scanning ${cityInfo?.label || 'City'} traffic sensors...`);
+      thoughts.push(`Found active traffic nodes. ${cityInfo?.label || 'City'} ring road speed sensor shows congested status.`);
       
       const delayCount = liveTransport ? liveTransport.filter(line => {
         const desc = line.lineStatuses?.[0]?.statusSeverityDescription;
         return desc && desc !== 'Good Service' && desc !== 'Special Service';
       }).length : 0;
       
-      content = `**Traffic Congestion & Transit Analysis**:
-* Piccadilly Circus and London Bridge North CCTV nodes are reporting normal active traffic flows.
-* Tower Bridge speed sensor reports **Congested** with speeds averaging 8 mph (84% congestion).
-* TfL Tube network currently reports **${delayCount} lines** experiencing delays or service adjustments.`;
+      content = `**Traffic Congestion & Transit Analysis for ${cityInfo?.label || 'City'}**:
+* City CCTV nodes are reporting normal active traffic flows at major junctions.
+* Ring road speed sensor reports **${delayCount > 0 ? 'Congested' : 'Moderate'}** with speeds averaging ${delayCount > 0 ? '18' : '35'} km/h.
+* City transit network currently reports **${delayCount} lines** experiencing delays or service adjustments.`;
       
       actions = [
-        { name: "Adjust Piccadilly roundabout signal offsets by 25s", impact: "Reduces backlog queue lengths by 22%" },
+        { name: `Adjust ${cityInfo?.label || 'City'} signal offsets by 25s at key junctions`, impact: "Reduces backlog queue lengths by 22%" },
         { name: "Enforce smart toll pricing dynamic offset levels", impact: "Depresses central commuter volume by 12%" }
       ];
     } 
@@ -174,7 +174,7 @@ export default function AICopilot({
 * **Solar Output**: ${sustainability?.solar_output_mw || 15.2} MW current microgrid output.`;
       
       actions = [
-        { name: "Activate London District green zone air mist sprays", impact: "Clears particulate matter PM2.5 levels by 15%" }
+        { name: `Activate ${cityInfo?.label || 'City'} green zone air mist sprays`, impact: "Clears particulate matter PM2.5 levels by 15%" }
       ];
     }
     else if (normQuery.includes("complaint") || normQuery.includes("ticket") || normQuery.includes("incident")) {
@@ -193,9 +193,9 @@ export default function AICopilot({
     }
     else if (normQuery.includes("budget") || normQuery.includes("spent") || normQuery.includes("money") || normQuery.includes("cost")) {
       thoughts.push("Querying municipal treasury ledgers...");
-      content = `**Municipal Financial & Carbon Budget Report**:
+      content = `**Municipal Financial & Carbon Budget Report for ${cityInfo?.label || 'City'}**:
 * **Carbon Offset Savings**: ${sustainability?.carbon_saved_tonnes_hr || 3.8} Tonnes/hr saved.
-* **Total YTD Spent**: £${(sustainability?.renewable_grid_mix_pct || 65) * 1.2}M across sectors.
+* **Total YTD Spent**: ₹${((sustainability?.renewable_grid_mix_pct || 65) * 120).toLocaleString('en-IN')} Cr across sectors.
 * All departmental finances are balanced and compliant with statutory targets.`;
       
       actions = [
@@ -205,10 +205,10 @@ export default function AICopilot({
     else {
       thoughts.push("Accessing general knowledge index...");
       thoughts.push("Correlating overall performance score: 86%");
-      content = `Hello! I am the CivicMind AI Decision Copilot. 
-Here is a quick overview of the city:
-* **Mobility**: Tube network operating normally; local bike docking stations are active.
-* **Environment**: Temperature is ${liveWeather?.current?.temperature_2m || 16}°C; PM2.5 particulate count is good.
+      content = `Hello! I am the CivicMind AI Decision Copilot for **${cityInfo?.label || 'your city'}**. 
+Here is a quick overview:
+* **Mobility**: City metro & rail networks operating; local cycle sharing stations are active.
+* **Environment**: Temperature is ${liveWeather?.current?.temperature_2m || 28}°C; PM2.5 particulate count is ${(liveAqi?.current?.pm2_5 || 25) > 35 ? 'elevated' : 'acceptable'}.
 * **Active Issues**: ${tickets.filter(t => t.status !== "Resolved").length} open complaints are being tracked.
 
 Ask me about: **traffic, air quality, citizen complaints, or budgets** to run smart analytics!`;

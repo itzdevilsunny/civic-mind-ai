@@ -253,14 +253,14 @@ export default function App() {
   const [proposalForm, setProposalForm] = useState({
     title: '',
     category: 'Environmental',
-    district: 'Westminster',
+    district: cityInfo?.districts?.[0] || 'Central',
     description: ''
   });
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
 
   const [systemLogs, setSystemLogs] = useState([
-    "Traffic Agent: Westminster Grid monitoring initialized.",
-    "Transit Agent: TfL line statuses synced.",
+    `Traffic Agent: ${cityInfo?.label || 'City'} Grid monitoring initialized.`,
+    `Transit Agent: City metro/bus line statuses synced.`,
     "Safety Agent: OpenStreetMap interactive node layers ready."
   ]);
 
@@ -319,7 +319,7 @@ export default function App() {
       .then(newProp => {
         setIsSubmittingProposal(false);
         setProposals(prev => [newProp, ...prev]);
-        setProposalForm({ title: '', category: 'Environmental', district: 'Westminster', description: '' });
+        setProposalForm({ title: '', category: 'Environmental', district: cityInfo?.districts?.[0] || 'Central', description: '' });
         setSystemLogs(prev => [`Senate Chamber: Proposal ${newProp.id} evaluated. Senate Verdict: ${newProp.senate_result}.`, ...prev]);
         confetti({ particleCount: 80, spread: 60 });
       })
@@ -552,7 +552,7 @@ export default function App() {
       xAxis: { type: 'category', data: times, show: false },
       yAxis: { type: 'value', min: Math.min(...values) - 5, max: Math.max(...values) + 5, show: true },
       series: [{
-        name: 'FTSE 100',
+        name: liveMarket?.label || 'Nifty 50',
         type: 'line',
         data: values,
         smooth: true,
@@ -651,7 +651,7 @@ export default function App() {
       const desc = line.lineStatuses?.[0]?.statusSeverityDescription;
       return desc && desc !== 'Good Service' && desc !== 'Special Service';
     }).length : 0;
-    if (tubeDelayCount > 0) alerts.push(`${tubeDelayCount} Tube line delays`);
+    if (tubeDelayCount > 0) alerts.push(`${tubeDelayCount} transit line delays`);
     
     const rain = liveWeather?.current?.precipitation || 0.0;
     if (rain > 0.5) alerts.push(`wet road conditions (${rain}mm)`);
@@ -1090,15 +1090,23 @@ export default function App() {
                 <div className="card lg:col-span-2">
                   <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center">
                     <div>
-                      <h3 className="card-title"><TrendingUp className="w-5 h-5 text-indigo-600" /> Share Market (FTSE 100)</h3>
-                      <span className="card-subtitle">Live market data from Yahoo Finance ticker</span>
+                      <h3 className="card-title"><TrendingUp className="w-5 h-5 text-indigo-600" /> Share Market — Nifty 50 &amp; Sensex</h3>
+                      <span className="card-subtitle">Live NSE &amp; BSE market data via Yahoo Finance</span>
                     </div>
                     {liveMarket && (
                       <div className="text-right">
-                        <div className="font-bold font-mono text-lg text-indigo-650">{liveMarket.price.toLocaleString()}</div>
-                        <div className={`text-[10px] font-bold ${liveMarket.price >= liveMarket.previousClose ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {liveMarket.price >= liveMarket.previousClose ? '▲' : '▼'} {((liveMarket.price - liveMarket.previousClose) / liveMarket.previousClose * 100).toFixed(2)}%
+                        <div className="font-bold font-mono text-lg text-indigo-650">{liveMarket.label || 'Nifty 50'}: {liveMarket.price?.toLocaleString('en-IN')}</div>
+                        <div className={`text-[10px] font-bold ${(liveMarket.changePct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                          {(liveMarket.changePct || 0) >= 0 ? '▲' : '▼'} {Math.abs(liveMarket.changePct || 0).toFixed(2)}%
                         </div>
+                        {liveMarket.secondary && (
+                          <div className="text-[10px] text-slate-450 mt-0.5">
+                            {liveMarket.secondary.label}: {liveMarket.secondary.price?.toLocaleString('en-IN')}
+                            <span className={`ml-1 font-bold ${(liveMarket.secondary.changePct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                              {(liveMarket.secondary.changePct || 0) >= 0 ? '▲' : '▼'}{Math.abs(liveMarket.secondary.changePct || 0).toFixed(2)}%
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1146,7 +1154,7 @@ export default function App() {
                   <div className="text-3xl font-bold font-mono text-sky-700 dark:text-sky-400 mt-2">
                     {activeTrains.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-4">TfL Tube Lines (Live Status Weighted)</div>
+                  <div className="text-[10px] text-slate-450 mt-4">{cityInfo?.label || 'City'} Metro &amp; Rail Network (Live Status)</div>
                 </div>
                 <div className="card bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-150">
                   <div className="card-header pb-2">
@@ -1156,7 +1164,7 @@ export default function App() {
                     {bikepoints.global.total_bikes.toLocaleString()}
                   </div>
                   <div className="text-[10px] text-slate-450 mt-4">
-                    Santander Cycles: {bikepoints.global.occupancy_pct}% Docks Occupied
+                    {cityInfo?.label || 'City'} Cycles: {bikepoints.global?.occupancy_pct || 0}% Docks Occupied
                   </div>
                 </div>
               </div>
@@ -1165,8 +1173,8 @@ export default function App() {
                 {/* Tube Status Board */}
                 <div className="card">
                   <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title">Tube Status Board</h3>
-                    <span className="card-subtitle">Live TfL Underground Network Statuses</span>
+                    <h3 className="card-title">🚇 {cityInfo?.label || 'City'} Transit Status</h3>
+                    <span className="card-subtitle">Live metro, rail &amp; bus network statuses</span>
                   </div>
                   {liveTransport && liveTransport.length > 0 ? (
                     <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1">
@@ -1187,7 +1195,7 @@ export default function App() {
                       })}
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-400">Loading TfL tube statuses...</div>
+                    <div className="text-xs text-slate-400">Loading city transit statuses...</div>
                   )}
                 </div>
 
@@ -1195,7 +1203,7 @@ export default function App() {
                 <div className="card">
                   <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
                     <div>
-                      <h3 className="card-title">🚲 Santander Cycles Docks</h3>
+                      <h3 className="card-title">🚲 {cityInfo?.label || 'City'} Cycle Sharing Hubs</h3>
                       <span className="card-subtitle">Real-time dock and bike availability</span>
                     </div>
                     <input 
@@ -1230,7 +1238,7 @@ export default function App() {
                     ) : (
                       <div className="text-center py-8 text-slate-450">
                         <span className="text-2xl block mb-1">🔍</span>
-                        <p className="text-xs">No matching Santander Cycle docks found.</p>
+                        <p className="text-xs">No matching cycle hubs found in {cityInfo?.label || 'city'}.</p>
                       </div>
                     )}
                   </div>
@@ -1863,6 +1871,7 @@ export default function App() {
                 liveWeather={liveWeather}
                 liveAqi={liveAqi}
                 tickets={tickets}
+                cityInfo={cityInfo}
               />
             </div>
           )}
