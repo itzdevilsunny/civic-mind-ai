@@ -75,6 +75,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [bikeSearchQuery, setBikeSearchQuery] = useState('');
   const [aqiForecast, setAqiForecast] = useState(null);
+  const [sustainability, setSustainability] = useState(null);
   const [bikepoints, setBikepoints] = useState({
     success: false,
     global: { total_bikes: 4195, total_empty: 1055, total_docks: 5250, active_stations: 795, occupancy_pct: 80 },
@@ -174,8 +175,9 @@ export default function App() {
       fetch('/api/telemetry').then(res => res.json()).catch(() => []),
       fetch('/api/actions').then(res => res.json()).catch(() => []),
       fetch('/api/live/aqi/forecast').then(res => res.json()).catch(() => null),
-      fetch('/api/live/bikepoints').then(res => res.json()).catch(() => null)
-    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData]) => {
+      fetch('/api/live/bikepoints').then(res => res.json()).catch(() => null),
+      fetch('/api/sustainability/metrics').then(res => res.json()).catch(() => null)
+    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
@@ -185,6 +187,7 @@ export default function App() {
       if (actionsData) setActionHistory(actionsData);
       if (aqiForecastData) setAqiForecast(aqiForecastData);
       if (bikepointsData) setBikepoints(bikepointsData);
+      if (sustainabilityData) setSustainability(sustainabilityData);
       if (dbTickets) {
         setTickets(dbTickets);
         setIsBackendOnline(true);
@@ -312,6 +315,49 @@ export default function App() {
         { name: 'PM10 (µg/m³)', type: 'line', data: pm10Data, smooth: true, itemStyle: { color: '#10b981' } },
         { name: 'Nitrogen Dioxide (µg/m³)', type: 'bar', data: no2Data, itemStyle: { color: '#6366f1' } }
       ]
+    };
+  };
+
+  const getWeatherChartOption = () => {
+    const days = liveWeather?.daily?.time || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const maxTemp = liveWeather?.daily?.temperature_2m_max || [22, 23, 21, 19, 22, 24, 25];
+    const minTemp = liveWeather?.daily?.temperature_2m_min || [12, 13, 11, 10, 12, 14, 15];
+
+    return {
+      tooltip: { trigger: 'axis', formatter: '{b}<br/>Max: {c0}°C<br/>Min: {c1}°C' },
+      legend: { data: ['Max Temperature', 'Min Temperature'], bottom: 0 },
+      grid: { left: '3%', right: '3%', top: '10%', bottom: '15%', containLabel: true },
+      xAxis: { type: 'category', data: days, axisLine: { lineStyle: { color: '#cbd5e1' } } },
+      yAxis: { type: 'value', axisLabel: { formatter: '{value}°C' }, splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      series: [
+        { name: 'Max Temperature', type: 'line', data: maxTemp, smooth: true, itemStyle: { color: '#ef4444' }, lineStyle: { width: 3 } },
+        { name: 'Min Temperature', type: 'line', data: minTemp, smooth: true, itemStyle: { color: '#3b82f6' }, lineStyle: { width: 3 } }
+      ]
+    };
+  };
+
+  const getSustainabilityChartOption = () => {
+    if (!sustainability || !sustainability.district_ranks) return {};
+    const districts = sustainability.district_ranks.map(d => d.district).reverse();
+    const scores = sustainability.district_ranks.map(d => d.score).reverse();
+
+    return {
+      tooltip: { trigger: 'axis', formatter: '{b}: {c}/100' },
+      grid: { left: '3%', right: '8%', top: '5%', bottom: '5%', containLabel: true },
+      xAxis: { type: 'value', max: 100, splitLine: { lineStyle: { color: '#f1f5f9' } } },
+      yAxis: { type: 'category', data: districts, axisLine: { show: false }, axisTick: { show: false } },
+      series: [{
+        type: 'bar',
+        data: scores.map(val => ({
+          value: val,
+          itemStyle: {
+            color: val >= 85 ? '#10b981' : val >= 70 ? '#f59e0b' : '#ef4444',
+            borderRadius: [0, 4, 4, 0]
+          }
+        })),
+        barMaxWidth: 18,
+        label: { show: true, position: 'right', formatter: '{c}' }
+      }]
     };
   };
 
@@ -832,26 +878,34 @@ export default function App() {
           {/* TAB 4: WEATHER & FORECAST */}
           {activeTab === 'weather' && (
             <div className="flex flex-col gap-6">
+              
+              {/* Live Weather Forecast Summary */}
               <div className="card">
                 <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                  <h3 className="card-title">Live Weather Forecast</h3>
+                  <h3 className="card-title">Live Weather &amp; Meteorological Forecast</h3>
+                  <span className="card-subtitle">Real-time reports for London Central</span>
                 </div>
                 {liveWeather ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                    <div className="flex flex-col items-center p-4 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/30">
-                      <span className="text-xs text-slate-400 font-bold uppercase">Today</span>
-                      <div className="text-3xl font-bold font-mono mt-2">{liveWeather.current.temperature_2m}°C</div>
-                      <span className="text-xs text-slate-500 mt-1">Precipitation: {liveWeather.current.precipitation} mm</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Temperature</div>
+                      <div className="text-xl font-bold font-mono text-indigo-650">{liveWeather.current.temperature_2m}°C</div>
+                      <div className="text-[9px] text-slate-450">Apparent: {liveWeather.current.apparent_temperature}°C</div>
                     </div>
-                    <div className="flex flex-col items-center p-4 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/30">
-                      <span className="text-xs text-slate-400 font-bold uppercase">Wind Details</span>
-                      <div className="text-3xl font-bold font-mono mt-2">{liveWeather.current.wind_speed_10m} km/h</div>
-                      <span className="text-xs text-slate-500 mt-1">Angle: {liveWeather.current.wind_direction_10m}°</span>
+                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Wind Speed</div>
+                      <div className="text-xl font-bold font-mono text-emerald-600">{liveWeather.current.wind_speed_10m} km/h</div>
+                      <div className="text-[9px] text-slate-450">Direction: {liveWeather.current.wind_direction_10m}°</div>
                     </div>
-                    <div className="flex flex-col items-center p-4 border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/30">
-                      <span className="text-xs text-slate-400 font-bold uppercase">Humidity Level</span>
-                      <div className="text-3xl font-bold font-mono mt-2">{liveWeather.current.relative_humidity_2m}%</div>
-                      <span className="text-xs text-slate-500 mt-1">Apparent: {liveWeather.current.apparent_temperature}°C</span>
+                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Humidity</div>
+                      <div className="text-xl font-bold font-mono text-amber-500">{liveWeather.current.relative_humidity_2m}%</div>
+                      <div className="text-[9px] text-slate-450">Precipitation: {liveWeather.current.precipitation} mm</div>
+                    </div>
+                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Air Quality Index</div>
+                      <div className="text-xl font-bold font-mono text-rose-500">{liveAqi?.current?.pm2_5 || 12} µg/m³</div>
+                      <div className="text-[9px] text-slate-450">NO₂: {liveAqi?.current?.nitrogen_dioxide || 22} µg/m³</div>
                     </div>
                   </div>
                 ) : (
@@ -859,15 +913,119 @@ export default function App() {
                 )}
               </div>
 
-              {/* Weekly air quality forecast chart */}
-              <div className="card">
-                <div className="card-header pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <h4 className="card-title"><Wind className="w-5 h-5 text-indigo-650" /> Weekly Air Quality Predictions</h4>
+              {/* Charts Row: Temp Curves + Air Quality */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="card">
+                  <div className="card-header pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <h4 className="card-title">📈 7-Day Temperature Forecast</h4>
+                    <span className="card-subtitle">Daily maximum &amp; minimum temperature paths</span>
+                  </div>
+                  <div className="h-[280px] mt-4">
+                    <ReactECharts option={getWeatherChartOption()} style={{ height: '100%', width: '100%' }} />
+                  </div>
                 </div>
-                <div className="h-[300px] mt-4">
-                  <ReactECharts option={getForecastChart()} style={{ height: '100%', width: '100%' }} />
+
+                <div className="card">
+                  <div className="card-header pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <h4 className="card-title">🍃 Weekly Air Quality Predictions</h4>
+                    <span className="card-subtitle">Predicted particulate concentrations</span>
+                  </div>
+                  <div className="h-[280px] mt-4">
+                    <ReactECharts option={getForecastChart()} style={{ height: '100%', width: '100%' }} />
+                  </div>
                 </div>
               </div>
+
+              {/* Sustainability Headline Banner */}
+              {sustainability && (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="card p-4 border-l-4 border-emerald-500 bg-emerald-50/10">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Solar Generation</p>
+                      <p className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{sustainability.solar_output_mw} MW</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Array efficiency: {sustainability.solar_efficiency}%</p>
+                    </div>
+                    <div className="card p-4 border-l-4 border-sky-500 bg-sky-50/10">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Renewable Grid Mix</p>
+                      <p className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{sustainability.renewable_mix_pct}%</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Solar / wind weighted</p>
+                    </div>
+                    <div className="card p-4 border-l-4 border-teal-500 bg-teal-50/10">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Carbon Saved</p>
+                      <p className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{sustainability.carbon_saved_t_hr} T/hr</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Solar offset equivalent</p>
+                    </div>
+                    <div className="card p-4 border-l-4 border-rose-500 bg-rose-50/10">
+                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">CO2 Emissions Index</p>
+                      <p className="text-xl font-black text-slate-800 dark:text-slate-200 mt-0.5">{(sustainability.emissions_kg_hr / 1000).toFixed(2)} T/hr</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Base + Traffic load computed</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* District Sustainability Health Chart */}
+                    <div className="card lg:col-span-2">
+                      <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                        <h3 className="card-title">🏢 London District Green Rating</h3>
+                        <span className="card-subtitle">Environmental indices scored from live ticket loads &amp; AQI levels</span>
+                      </div>
+                      <div className="h-[250px]">
+                        <ReactECharts option={getSustainabilityChartOption()} style={{ height: '100%', width: '100%' }} />
+                      </div>
+                    </div>
+
+                    {/* AI Executive Summary Card */}
+                    <div className="card flex flex-col justify-between">
+                      <div>
+                        <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                          <h3 className="card-title">🤖 AI Sustainability Diagnosis</h3>
+                          <span className="card-subtitle">Gemini operational environmental health audit</span>
+                        </div>
+                        <p className="text-xs text-slate-600 dark:text-slate-350 leading-relaxed font-medium mt-1">
+                          {sustainability.ai_analysis?.sustainability_summary}
+                        </p>
+                      </div>
+                      <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-500">CLIMATE RISK PROFILE:</span>
+                        <span className={`font-black px-2 py-0.5 rounded text-[10px] ${
+                          sustainability.ai_analysis?.climate_risk_level === 'Low'
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
+                        }`}>
+                          {sustainability.ai_analysis?.climate_risk_level || 'Calculating...'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Recommendations panel */}
+                  <div className="card">
+                    <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                      <h3 className="card-title">💡 Climate &amp; Green Policy Suggestions</h3>
+                      <span className="card-subtitle">AI recommendations to lower municipality carbon index</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {(sustainability.ai_analysis?.recommendations || []).map((rec, i) => {
+                        const prioColors = { High: 'text-red-500 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/30', Medium: 'text-amber-500 bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/30', Low: 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/30' };
+                        const cardStyles = prioColors[rec.priority] || '';
+                        return (
+                          <div key={i} className={'p-4 rounded-xl border flex flex-col gap-2 ' + cardStyles}>
+                            <div className="flex justify-between items-start gap-2">
+                              <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-200 leading-snug">{rec.title}</h4>
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase">{rec.priority} PRIO</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 leading-relaxed">{rec.description}</p>
+                            <div className="mt-auto pt-2 border-t border-slate-200/30 flex justify-between text-[9px] text-slate-400">
+                              <span>Impact: <strong>{rec.impact}</strong></span>
+                              <span>Cost: <strong>{rec.cost}</strong></span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
