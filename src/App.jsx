@@ -668,10 +668,14 @@ export default function App() {
               <div className="h-[450px]">
                 <DigitalTwin 
                   nodesList={telemetry}
+                  activeTickets={tickets}
+                  onEmergencyDispatch={loadLiveData}
                   onSelectNode={(node) => {
                     if (node.action === 'dispatch') {
                       setSystemLogs(prev => [`Safety Agent: [Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
                       confetti({ particleCount: 80, spread: 60 });
+                    } else if (node.type === 'emergency') {
+                      setSystemLogs(prev => [`Safety Agent: Querying emergency hub: ${node.name}`, ...prev]);
                     } else {
                       setSystemLogs(prev => [`Traffic Agent: Selected traffic node: ${node.name}`, ...prev]);
                     }

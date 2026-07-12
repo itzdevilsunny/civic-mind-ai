@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Camera, AlertTriangle, Wind, Zap, Activity, Info } from 'lucide-react';
+import { Layers, Camera, AlertTriangle, Wind, Zap, Activity, Info, ShieldAlert } from 'lucide-react';
 
 const initialNodes = [
   { id: 'weather-1', type: 'aqi', name: 'Westminster Air Quality Hub', lat: 51.4988, lon: -0.1309, status: 'Good', metric: 'PM2.5: 8 µg/m³ | PM10: 12 µg/m³', color: '#10b981' },
@@ -12,26 +12,41 @@ const initialNodes = [
   { id: 'incident-1', type: 'incident', name: 'Water Main Burst - Waterloo Road', lat: 51.5033, lon: -0.1123, status: 'Critical', metric: 'Water depth: 15cm | Response team dispatched', color: '#ef4444' }
 ];
 
-export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [] }) {
+export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch }) {
   const [nodes, setNodes] = useState(nodesList.length > 0 ? nodesList : initialNodes);
+  const [emergencyServices, setEmergencyServices] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
+  
   const [activeLayers, setActiveLayers] = useState({
     camera: true,
     traffic: true,
     aqi: true,
     power: true,
-    incident: true
+    incident: true,
+    emergency: true
   });
+
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markersRef = useRef({});
+
+  // Fetch emergency services on mount
+  useEffect(() => {
+    fetch('/api/emergency/services')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setEmergencyServices(data);
+        }
+      })
+      .catch(err => console.error("Failed to load emergency services:", err));
+  }, []);
 
   useEffect(() => {
     if (nodesList && nodesList.length > 0) {
       setNodes(nodesList);
     }
   }, [nodesList]);
-
-  const mapContainerRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const markersRef = useRef({});
 
   // Dynamic incident support
   useEffect(() => {
@@ -69,7 +84,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       maxZoom: 20
     }).addTo(map);
 
-    updateMarkers(nodes);
+    updateMarkers(nodes, emergencyServices);
 
     return () => {
       if (mapInstanceRef.current) {
@@ -78,16 +93,16 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [emergencyServices]); // reload when emergency services load
 
   useEffect(() => {
     if (mapInstanceRef.current) {
-      updateMarkers(nodes);
+      updateMarkers(nodes, emergencyServices);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, activeLayers]);
+  }, [nodes, emergencyServices, activeLayers]);
 
-  const updateMarkers = (currentNodes) => {
+  const updateMarkers = (currentNodes, services) => {
     const map = mapInstanceRef.current;
     if (!map || !window.L) return;
 
@@ -97,7 +112,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
     });
     markersRef.current = {};
 
-    // Add new markers based on filters
+    // 1. Add standard IoT nodes
     currentNodes.forEach(node => {
       if (!activeLayers[node.type]) return;
 
@@ -135,6 +150,70 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
 
       markersRef.current[node.id] = marker;
     });
+
+    // 2. Add emergency services layer
+    if (activeLayers.emergency) {
+      services.forEach(svc => {
+        const typeColors = {
+          hospital: '#ef4444',
+          fire_station: '#f97316',
+          police: '#3b82f6',
+          ambulance: '#6366f1'
+        };
+        const color = typeColors[svc.type] || '#475569';
+        const letter = svc.type === 'hospital' ? 'H' : svc.type === 'fire_station' ? 'F' : svc.type === 'police' ? 'P' : 'A';
+        
+        const iconHtml = `
+          <div style="
+            background-color: ${color};
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 10px ${color};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 9px;
+            font-weight: 800;
+          ">
+            ${letter}
+          </div>
+        `;
+
+        const customIcon = window.L.divIcon({
+          html: iconHtml,
+          className: 'custom-emergency-marker',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        });
+
+        const marker = window.L.marker([svc.lat, svc.lon], { icon: customIcon })
+          .addTo(map)
+          .on('click', () => {
+            setSelectedNode({
+              id: svc.id,
+              type: 'emergency',
+              name: svc.name,
+              status: svc.status,
+              metric: `Capacity: ${svc.capacity}`,
+              lat: svc.lat,
+              lon: svc.lon,
+              color: color
+            });
+          });
+
+        marker.bindPopup(`
+          <div class="map-marker-popup">
+            <strong style="color: #312e81">${svc.name}</strong><br/>
+            <span style="font-size: 11px; color: #475569">Status: ${svc.status} | ${svc.capacity}</span>
+          </div>
+        `);
+
+        markersRef.current[svc.id] = marker;
+      });
+    }
   };
 
   const toggleLayer = (layer) => {
@@ -149,6 +228,24 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
     }
   };
 
+  const handleEmergencyDispatch = (serviceId, ticketId) => {
+    fetch('/api/emergency/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service_id: serviceId, ticket_id: ticketId })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success') {
+          if (onEmergencyDispatch) {
+            onEmergencyDispatch();
+          }
+          setSelectedNode(null);
+        }
+      })
+      .catch(err => console.error("Emergency dispatch failed:", err));
+  };
+
   const getIcon = (type) => {
     switch (type) {
       case 'camera': return <Camera className="w-4 h-4 text-indigo-500" />;
@@ -156,6 +253,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       case 'aqi': return <Wind className="w-4 h-4 text-orange-500" />;
       case 'power': return <Zap className="w-4 h-4 text-yellow-500" />;
       case 'incident': return <AlertTriangle className="w-4 h-4 text-rose-500" />;
+      case 'emergency': return <ShieldAlert className="w-4 h-4 text-indigo-650" />;
       default: return <Info className="w-4 h-4 text-slate-500" />;
     }
   };
@@ -188,7 +286,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
 
         {/* Floating Node Information Card overlay */}
         {selectedNode && (
-          <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-sm z-[1000] animate-fade-in">
+          <div className="absolute top-4 left-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-sm z-[1000] auto-focus-info animate-fade-in">
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-center gap-2">
                 {getIcon(selectedNode.type)}
@@ -196,18 +294,18 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
               </div>
               <button 
                 onClick={() => setSelectedNode(null)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xs font-bold"
+                className="text-slate-400 hover:text-slate-650 dark:hover:text-slate-300 text-xs font-bold"
               >
                 ✕
               </button>
             </div>
             <h4 className="font-bold text-slate-900 dark:text-slate-100 text-sm mb-1">{selectedNode.name}</h4>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mb-3">{selectedNode.metric}</p>
+            <p className="text-xs text-slate-600 dark:text-slate-350 mb-3">{selectedNode.metric}</p>
             
             <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-850 p-2 rounded-lg text-[11px] border border-slate-100 dark:border-slate-800">
               <span className="text-slate-500 font-medium">Status:</span>
               <span className={`font-bold px-1.5 py-0.5 rounded-full text-[10px] ${
-                selectedNode.status === 'Active' || selectedNode.status === 'Good' || selectedNode.status === 'Flowing' || selectedNode.status === 'Normal'
+                selectedNode.status === 'Active' || selectedNode.status === 'Good' || selectedNode.status === 'Flowing' || selectedNode.status === 'Normal' || selectedNode.status === 'Optimal' || selectedNode.status === 'Ready'
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
                   : selectedNode.status === 'Resolving'
                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400'
@@ -217,7 +315,40 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
               </span>
             </div>
 
-            {['Congested', 'Critical', 'Active'].includes(selectedNode.status) && (
+            {/* Ticket dispatch dropdown configuration */}
+            {selectedNode.type === 'emergency' && (
+              <div className="mt-3 pt-3 border-t border-slate-150 dark:border-slate-800">
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">DISPATCH TO ACTIVE TICKET</label>
+                {activeTickets.filter(t => t.status !== 'Resolved').length === 0 ? (
+                  <p className="text-[11px] text-slate-450 italic">No active citizen complaints to coordinate.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <select 
+                      id="emergency-dispatch-select"
+                      className="form-input text-xs py-1 px-1.5"
+                    >
+                      {activeTickets.filter(t => t.status !== 'Resolved').map(t => (
+                        <option key={t.id} value={t.id}>{t.id} - {t.title}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        const selectEl = document.getElementById('emergency-dispatch-select');
+                        if (selectEl && selectEl.value) {
+                          handleEmergencyDispatch(selectedNode.id, selectEl.value);
+                        }
+                      }}
+                      className="btn btn-primary text-xs py-1.5 w-full flex items-center justify-center gap-1.5"
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <span>Dispatch Roster Unit</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {['Congested', 'Critical', 'Active'].includes(selectedNode.status) && selectedNode.type !== 'emergency' && (
               <button
                 onClick={() => handleDispatch(selectedNode)}
                 className="btn-3d btn-primary text-xs w-full mt-3 flex items-center justify-center gap-1.5"

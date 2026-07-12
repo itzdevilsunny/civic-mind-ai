@@ -112,7 +112,27 @@ def init_db():
             cursor.execute("ALTER TABLE action_history ADD COLUMN stage INTEGER DEFAULT 1")
         if "status" not in columns:
             cursor.execute("ALTER TABLE action_history ADD COLUMN status TEXT DEFAULT 'Alert Received'")
-        
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS emergency_services (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            status TEXT NOT NULL,
+            capacity TEXT NOT NULL,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL
+        );
+        """)
+        cursor.execute("SELECT COUNT(*) FROM emergency_services")
+        if cursor.fetchone()[0] == 0:
+            services_seed = [
+                ('EMG-HOSP1', "St Thomas' Hospital Emergency Unit", 'hospital', 'Optimal', '82% Bed Occupancy', 51.4988, -0.1189),
+                ('EMG-FIRE1', 'Lambeth Fire & Rescue Station', 'fire_station', 'Ready', '5 Fire Engines', 51.4947, -0.1165),
+                ('EMG-POL1', 'Charing Cross Police Precinct', 'police', 'Ready', '12 Patrol Cruisers', 51.5079, -0.1265),
+                ('EMG-AMB1', 'Waterloo Critical Ambulance Depot', 'ambulance', 'Optimal', '8 Medical Crews', 51.5033, -0.1123)
+            ]
+            cursor.executemany("INSERT INTO emergency_services (id, name, type, status, capacity, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?)", services_seed)
+
         # Seed initial tickets if empty
         cursor.execute("SELECT COUNT(*) FROM tickets")
         if cursor.fetchone()[0] == 0:
@@ -251,6 +271,19 @@ def db_get_action_history():
         logger.error(f"SQLite query actions error: {e}")
         return []
 
+def db_get_emergency_services():
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM emergency_services")
+        rows = cursor.fetchall()
+        services = [dict(row) for row in rows]
+        conn.close()
+        return services
+    except Exception as e:
+        logger.error(f"SQLite query emergency services error: {e}")
+        return []
 def db_log_telemetry(log: dict):
     global USE_SUPABASE
     if USE_SUPABASE and supabase_client:
@@ -665,7 +698,73 @@ def get_actions():
     Returns the action history log from the database.
     """
     return db_get_action_history()
+class EmergencyDispatchRequest(BaseModel):
+    service_id: str
+    ticket_id: str
 
+@app.get("/api/emergency/services")
+def get_emergency_services():
+    """
+    Returns the roster of emergency service hubs.
+    """
+    return db_get_emergency_services()
+
+@app.post("/api/emergency/dispatch")
+def emergency_dispatch(payload: EmergencyDispatchRequest, background_tasks: BackgroundTasks):
+    """
+    Dispatches a response unit from a station to an active ticket, logs the dispatch action,
+    and updates the ticket status/assigned officer.
+    """
+    from datetime import datetime, timezone
+    try:
+        conn = sqlite3.connect(SQLITE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM emergency_services WHERE id = ?", (payload.service_id,))
+        service = cursor.fetchone()
+        
+        cursor.execute("SELECT * FROM tickets WHERE id = ?", (payload.ticket_id,))
+        ticket = cursor.fetchone()
+        
+        if not service or not ticket:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Service or Ticket not found.")
+            
+        service = dict(service)
+        ticket = dict(ticket)
+        
+        refined_officer = f"{service['name']} Responder"
+        refined_dept = service['name']
+        
+        cursor.execute(
+            "UPDATE tickets SET status = 'Assigned', officer = ?, department = ?, stage = 2 WHERE id = ?",
+            (refined_officer, refined_dept, payload.ticket_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        action_id = str(uuid.uuid4())
+        action_name = f"Dispatch from {service['name']}"
+        impact_description = f"Assigned to ticket {payload.ticket_id}: '{ticket['title']}'."
+        
+        new_action = {
+            "id": action_id,
+            "action_name": action_name,
+            "impact": impact_description,
+            "stage": 1,
+            "status": "Alert Received",
+            "triggered_at": datetime.now(timezone.utc).isoformat()
+        }
+        db_log_action(new_action)
+        
+        background_tasks.add_task(simulate_dispatch_pipeline, action_id)
+        
+        return {"status": "success", "message": f"Successfully dispatched unit from {service['name']} to ticket {payload.ticket_id}.", "action_id": action_id}
+        
+    except Exception as e:
+        logger.error(f"Emergency dispatch failure: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 @app.post("/api/tickets")
 def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks):
     """
