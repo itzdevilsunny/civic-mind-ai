@@ -18,7 +18,7 @@ function useCounter(target, duration) {
       else setValue(Math.round(start));
     }, 16);
     return () => clearInterval(timer);
-  }, [target]);
+  }, [target, dur]);
   return value;
 }
 

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactECharts from 'echarts-for-react';
 
 const DISTRICT_COLORS = ['#6366f1','#f59e0b','#10b981','#3b82f6','#ec4899','#8b5cf6'];
@@ -35,7 +35,7 @@ function AnimatedNumber({ value, decimals = 0 }) {
       if (i >= steps) { clearInterval(timer); prevRef.current = end; }
     }, 900 / steps);
     return () => clearInterval(timer);
-  }, [value]);
+  }, [value, decimals]);
   return <span>{display.toFixed(decimals)}</span>;
 }
 

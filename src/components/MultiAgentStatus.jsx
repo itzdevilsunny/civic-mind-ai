@@ -76,17 +76,6 @@ const agentData = [
   }
 ];
 
-const logPool = [
-  "Community Health Agent: Running correlation scan on clinical reports. Outbreak risk: LOW (2.4%).",
-  "Traffic Agent: Signal cycle increased by 25s at Broadway. Traffic queue length reduced by 14%.",
-  "Disaster Agent: Rain sensors indicating 12mm/hr. River levels rising but within safety margins.",
-  "Public Safety Agent: Anomaly flagged on CCTV feed #182. License plate recorded. Assigning officer.",
-  "Waste Agent: Bin #48 in Commercial Downtown filled to 85%. Dispatched garbage truck #12.",
-  "Energy Agent: Substation E load reached 92%. Redirected 2.5 MW backup reserve from Station North.",
-  "Citizen Agent: Classifying complaint ID #9482 as Category: Roads & Bridges. Routed successfully.",
-  "Tourism Agent: Cultural district footfalls rising. Recommended parking diversion notice."
-];
-
 export default function MultiAgentStatus({ logsList = [] }) {
   const [agents, setAgents] = useState(agentData);
   const [logs, setLogs] = useState([

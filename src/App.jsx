@@ -11,7 +11,6 @@ import {
   FileText,
   CloudSun,
   Camera,
-  Wind,
   Radio,
   Volume2,
   FileDown,
@@ -155,9 +154,10 @@ export default function App() {
   };
 
   useEffect(() => {
+    const synth = synthRef.current;
     return () => {
-      if (synthRef.current) {
-        synthRef.current.cancel();
+      if (synth) {
+        synth.cancel();
       }
     };
   }, []);
@@ -1538,7 +1538,6 @@ export default function App() {
                   <div className="flex flex-col gap-4 max-h-[550px] overflow-y-auto pr-1">
                     {proposals.length > 0 ? (
                       proposals.map(prop => {
-                        const scoreColor = prop.feasibility >= 80 ? 'text-emerald-500 bg-emerald-500/10' : prop.feasibility >= 65 ? 'text-amber-500 bg-amber-500/10' : 'text-red-500 bg-red-500/10';
                         const scoreBarColor = prop.feasibility >= 80 ? 'bg-emerald-500' : prop.feasibility >= 65 ? 'bg-amber-500' : 'bg-red-500';
                         
                         const verdictStyles = {

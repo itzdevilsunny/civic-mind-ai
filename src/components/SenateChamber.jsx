@@ -54,6 +54,7 @@ export default function SenateChamber({ policyParams }) {
   // Convene on initial mount with default sensible params
   useEffect(() => {
     fetchDebate(policyParams || defaultParams);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When policyParams change after a simulation run, auto-convene the debate!
@@ -61,6 +62,7 @@ export default function SenateChamber({ policyParams }) {
     if (policyParams) {
       fetchDebate(policyParams);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [policyParams]);
 
   // Handle sequential message reveal
