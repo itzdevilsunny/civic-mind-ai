@@ -524,6 +524,87 @@ def get_live_transport():
         print(f"Error fetching TfL tube statuses: {e}")
     return []
 
+@app.get("/api/live/bikepoints")
+def get_live_bikepoints():
+    url = "https://api.tfl.gov.uk/BikePoint"
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            raw_stations = res.json()
+            total_bikes = 0
+            total_empty = 0
+            total_docks = 0
+            stations = []
+            
+            # Keywords for Central London stations to render on map
+            central_keywords = ["Waterloo", "Piccadilly", "Hyde Park", "Westminster", "Trafalgar", "Kings Cross", "London Bridge", "Blackfriars", "Southwark", "Holborn", "Covent Garden", "Soho", "Charing Cross", "Embankment", "Victoria Station", "Piccadilly Circus"]
+            
+            for item in raw_stations:
+                props = {p["key"]: p["value"] for p in item.get("additionalProperties", []) if "key" in p and "value" in p}
+                try:
+                    bikes = int(props.get("NbBikes", 0))
+                    empty = int(props.get("NbEmptyDocks", 0))
+                    docks = int(props.get("NbDocks", 0))
+                except (ValueError, TypeError):
+                    bikes = 0
+                    empty = 0
+                    docks = 0
+                
+                total_bikes += bikes
+                total_empty += empty
+                total_docks += docks
+                
+                name = item.get("commonName", "")
+                is_central = any(kw.lower() in name.lower() for kw in central_keywords)
+                
+                if is_central:
+                    stations.append({
+                        "id": item.get("id"),
+                        "name": name,
+                        "lat": item.get("lat"),
+                        "lon": item.get("lon"),
+                        "bikes": bikes,
+                        "empty": empty,
+                        "docks": docks,
+                        "occupancy_pct": round((bikes / max(1, docks)) * 100)
+                    })
+            
+            # Limit to top 25 for map/performance
+            stations = sorted(stations, key=lambda x: x["docks"], reverse=True)[:25]
+            
+            return {
+                "success": True,
+                "global": {
+                    "total_bikes": total_bikes,
+                    "total_empty": total_empty,
+                    "total_docks": total_docks,
+                    "active_stations": len(raw_stations),
+                    "occupancy_pct": round((total_bikes / max(1, total_docks)) * 100) if total_docks else 0
+                },
+                "stations": stations
+            }
+    except Exception as e:
+        print(f"Error fetching TfL BikePoint details: {e}")
+        
+    fallback_stations = [
+        {"id": "BikePoints_1", "name": "Waterloo Station 3, Southwark", "lat": 51.5033, "lon": -0.1123, "bikes": 14, "empty": 26, "docks": 40, "occupancy_pct": 35},
+        {"id": "BikePoints_2", "name": "Piccadilly Circus, Westminster", "lat": 51.5101, "lon": -0.1349, "bikes": 8, "empty": 12, "docks": 20, "occupancy_pct": 40},
+        {"id": "BikePoints_3", "name": "Hyde Park Corner, Westminster", "lat": 51.5028, "lon": -0.1508, "bikes": 22, "empty": 8, "docks": 30, "occupancy_pct": 73},
+        {"id": "BikePoints_4", "name": "Trafalgar Square, Westminster", "lat": 51.5080, "lon": -0.1280, "bikes": 5, "empty": 19, "docks": 24, "occupancy_pct": 21},
+        {"id": "BikePoints_5", "name": "Kings Cross Station, Holborn", "lat": 51.5308, "lon": -0.1238, "bikes": 18, "empty": 22, "docks": 40, "occupancy_pct": 45}
+    ]
+    return {
+        "success": False,
+        "global": {
+            "total_bikes": 4195,
+            "total_empty": 1055,
+            "total_docks": 5250,
+            "active_stations": 795,
+            "occupancy_pct": 80
+        },
+        "stations": fallback_stations
+    }
+
 @app.get("/api/live/market")
 def get_live_market():
     url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EFTSE?interval=5m&range=1d"

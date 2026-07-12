@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Camera, AlertTriangle, Wind, Zap, Activity, Info, ShieldAlert } from 'lucide-react';
+import { Layers, Camera, AlertTriangle, Wind, Zap, Activity, Info, ShieldAlert, Bike } from 'lucide-react';
 
 const initialNodes = [
   { id: 'weather-1', type: 'aqi', name: 'Westminster Air Quality Hub', lat: 51.4988, lon: -0.1309, status: 'Good', metric: 'PM2.5: 8 µg/m³ | PM10: 12 µg/m³', color: '#10b981' },
@@ -12,7 +12,7 @@ const initialNodes = [
   { id: 'incident-1', type: 'incident', name: 'Water Main Burst - Waterloo Road', lat: 51.5033, lon: -0.1123, status: 'Critical', metric: 'Water depth: 15cm | Response team dispatched', color: '#ef4444' }
 ];
 
-export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch }) {
+export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch, bikepointsList = [] }) {
   const [nodes, setNodes] = useState(nodesList.length > 0 ? nodesList : initialNodes);
   const [emergencyServices, setEmergencyServices] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -23,7 +23,8 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
     aqi: true,
     power: true,
     incident: true,
-    emergency: true
+    emergency: true,
+    bikeshare: true
   });
 
   const mapContainerRef = useRef(null);
@@ -84,7 +85,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       maxZoom: 20
     }).addTo(map);
 
-    updateMarkers(nodes, emergencyServices);
+    updateMarkers(nodes, emergencyServices, bikepointsList);
 
     return () => {
       if (mapInstanceRef.current) {
@@ -93,16 +94,16 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emergencyServices]); // reload when emergency services load
+  }, [emergencyServices, bikepointsList]); // reload when emergency services or bikepoints load
 
   useEffect(() => {
     if (mapInstanceRef.current) {
-      updateMarkers(nodes, emergencyServices);
+      updateMarkers(nodes, emergencyServices, bikepointsList);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, emergencyServices, activeLayers]);
+  }, [nodes, emergencyServices, activeLayers, bikepointsList]);
 
-  const updateMarkers = (currentNodes, services) => {
+  const updateMarkers = (currentNodes, services, bikepoints) => {
     const map = mapInstanceRef.current;
     if (!map || !window.L) return;
 
@@ -214,6 +215,67 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
         markersRef.current[svc.id] = marker;
       });
     }
+
+    // 3. Add bikeshare layer
+    if (activeLayers.bikeshare && bikepoints && bikepoints.length > 0) {
+      bikepoints.forEach(bp => {
+        const iconHtml = `
+          <div style="
+            background-color: #0ea5e9;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid white;
+            box-shadow: 0 0 10px #0ea5e9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 8px;
+            font-weight: 800;
+          ">
+            🚲
+          </div>
+        `;
+
+        const customIcon = window.L.divIcon({
+          html: iconHtml,
+          className: 'custom-bikeshare-marker',
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+
+        const marker = window.L.marker([bp.lat, bp.lon], { icon: customIcon })
+          .addTo(map)
+          .on('click', () => {
+            setSelectedNode({
+              id: bp.id,
+              type: 'bikeshare',
+              name: bp.name,
+              status: bp.bikes > 0 ? 'Active' : 'Empty',
+              metric: `Bikes: ${bp.bikes} available | Docks: ${bp.empty} empty spaces`,
+              lat: bp.lat,
+              lon: bp.lon,
+              color: '#0ea5e9',
+              bikes: bp.bikes,
+              empty: bp.empty,
+              docks: bp.docks,
+              occupancy_pct: bp.occupancy_pct
+            });
+          });
+
+        marker.bindPopup(`
+          <div class="map-marker-popup">
+            <strong style="color: #0369a1">${bp.name}</strong><br/>
+            <span style="font-size: 11px; color: #0284c7">
+              🚲 <strong>${bp.bikes}</strong> available &middot; 🔓 <strong>${bp.empty}</strong> spaces
+            </span>
+          </div>
+        `);
+
+        markersRef.current[bp.id] = marker;
+      });
+    }
   };
 
   const toggleLayer = (layer) => {
@@ -254,6 +316,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       case 'power': return <Zap className="w-4 h-4 text-yellow-500" />;
       case 'incident': return <AlertTriangle className="w-4 h-4 text-rose-500" />;
       case 'emergency': return <ShieldAlert className="w-4 h-4 text-indigo-650" />;
+      case 'bikeshare': return <Bike className="w-4 h-4 text-sky-500" />;
       default: return <Info className="w-4 h-4 text-slate-500" />;
     }
   };
@@ -314,6 +377,29 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
                 {selectedNode.status}
               </span>
             </div>
+
+            {/* Bikeshare station details */}
+            {selectedNode.type === 'bikeshare' && (
+              <div className="mt-3 pt-3 border-t border-slate-150 dark:border-slate-800 flex flex-col gap-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-semibold">Available Bikes:</span>
+                  <span className="font-bold text-sky-600 font-mono text-sm">{selectedNode.bikes}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-semibold">Empty Docks:</span>
+                  <span className="font-bold text-slate-600 dark:text-slate-400 font-mono text-sm">{selectedNode.empty}</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-1">
+                  <div 
+                    className="h-full bg-sky-500 rounded-full" 
+                    style={{ width: (selectedNode.occupancy_pct || 0) + '%' }}
+                  />
+                </div>
+                <span className="text-[10px] text-slate-450 text-right font-medium">
+                  Occupancy: {selectedNode.occupancy_pct || 0}%
+                </span>
+              </div>
+            )}
 
             {/* Ticket dispatch dropdown configuration */}
             {selectedNode.type === 'emergency' && (
