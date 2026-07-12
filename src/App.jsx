@@ -16,7 +16,8 @@ import {
   Volume2,
   FileDown,
   HeartPulse,
-  PoundSterling
+  PoundSterling,
+  Lightbulb
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -52,6 +53,17 @@ const initialTickets = [
     officer: 'Elena Rostova',
     submittedAt: 'Jul 05, 2026, 02:15 PM',
     stage: 4
+  },
+  {
+    id: 'LND-9210',
+    title: 'Flickering streetlights outside Senior Care Center',
+    category: 'Utilities & Lighting',
+    priority: 'Critical',
+    status: 'Assigned',
+    department: 'Power Grid Commission',
+    officer: 'Julian Drake',
+    submittedAt: 'Jul 06, 2026, 06:45 PM',
+    stage: 2
   }
 ];
 
@@ -76,6 +88,7 @@ export default function App() {
   const [bikeSearchQuery, setBikeSearchQuery] = useState('');
   const [aqiForecast, setAqiForecast] = useState(null);
   const [sustainability, setSustainability] = useState(null);
+  const [proposals, setProposals] = useState([]);
   const [bikepoints, setBikepoints] = useState({
     success: false,
     global: { total_bikes: 4195, total_empty: 1055, total_docks: 5250, active_stations: 795, occupancy_pct: 80 },
@@ -157,6 +170,14 @@ export default function App() {
     description: ''
   });
 
+  const [proposalForm, setProposalForm] = useState({
+    title: '',
+    category: 'Environmental',
+    district: 'Westminster',
+    description: ''
+  });
+  const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
+
   const [systemLogs, setSystemLogs] = useState([
     "Traffic Agent: Westminster Grid monitoring initialized.",
     "Transit Agent: TfL line statuses synced.",
@@ -176,8 +197,9 @@ export default function App() {
       fetch('/api/actions').then(res => res.json()).catch(() => []),
       fetch('/api/live/aqi/forecast').then(res => res.json()).catch(() => null),
       fetch('/api/live/bikepoints').then(res => res.json()).catch(() => null),
-      fetch('/api/sustainability/metrics').then(res => res.json()).catch(() => null)
-    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData]) => {
+      fetch('/api/sustainability/metrics').then(res => res.json()).catch(() => null),
+      fetch('/api/proposals').then(res => res.json()).catch(() => [])
+    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData, proposalsData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
@@ -188,6 +210,7 @@ export default function App() {
       if (aqiForecastData) setAqiForecast(aqiForecastData);
       if (bikepointsData) setBikepoints(bikepointsData);
       if (sustainabilityData) setSustainability(sustainabilityData);
+      if (proposalsData) setProposals(proposalsData);
       if (dbTickets) {
         setTickets(dbTickets);
         setIsBackendOnline(true);
@@ -195,6 +218,47 @@ export default function App() {
         setIsBackendOnline(false);
       }
     });
+  };
+
+  const handleProposalSubmit = (e) => {
+    e.preventDefault();
+    if (!proposalForm.title || !proposalForm.description) return;
+    
+    setIsSubmittingProposal(true);
+    setSystemLogs(prev => [`Citizen Agent: Submitting community proposal: "${proposalForm.title}"...`, ...prev]);
+    
+    fetch('/api/proposals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(proposalForm)
+    })
+      .then(res => res.json())
+      .then(newProp => {
+        setIsSubmittingProposal(false);
+        setProposals(prev => [newProp, ...prev]);
+        setProposalForm({ title: '', category: 'Environmental', district: 'Westminster', description: '' });
+        setSystemLogs(prev => [`Senate Chamber: Proposal ${newProp.id} evaluated. Senate Verdict: ${newProp.senate_result}.`, ...prev]);
+        confetti({ particleCount: 80, spread: 60 });
+      })
+      .catch(err => {
+        console.error("Failed to submit proposal:", err);
+        setIsSubmittingProposal(false);
+        setSystemLogs(prev => [`System Error: Failed to register proposal.`, ...prev]);
+      });
+  };
+
+  const handleProposalUpvote = (id) => {
+    // Optimistic upvote increment
+    setProposals(prev => prev.map(p => p.id === id ? { ...p, upvotes: p.upvotes + 1 } : p));
+    setSystemLogs(prev => [`Citizen Agent: Registering support vote for proposal ${id}`, ...prev]);
+    
+    fetch(`/api/proposals/${id}/upvote`, {
+      method: 'POST'
+    })
+      .then(res => res.json())
+      .catch(err => {
+        console.error("Failed to upvote proposal:", err);
+      });
   };
 
   useEffect(() => {
@@ -465,6 +529,11 @@ export default function App() {
           <li className={`menu-item ${activeTab === 'budget' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('budget')}>
               <PoundSterling className="w-4 h-4" /> Budget Intelligence
+            </button>
+          </li>
+          <li className={`menu-item ${activeTab === 'proposals' ? 'active' : ''}`}>
+            <button onClick={() => setActiveTab('proposals')}>
+              <Lightbulb className="w-4 h-4" /> Community Proposals
             </button>
           </li>
         </ul>
@@ -1205,6 +1274,226 @@ export default function App() {
           {activeTab === 'budget' && (
             <div className="flex flex-col gap-0">
               <CityBudget />
+            </div>
+          )}
+
+          {/* TAB 9: COMMUNITY PROPOSALS & FEASIBILITY CHAMBER */}
+          {activeTab === 'proposals' && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              
+              {/* Left Column: Propose Community Idea Form */}
+              <div className="card h-fit">
+                <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-5">
+                  <h3 className="card-title">💡 Propose Community Idea</h3>
+                  <span className="card-subtitle">Submit a project idea to the multi-agent planning engine</span>
+                </div>
+                
+                <form onSubmit={handleProposalSubmit} className="flex flex-col gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">Proposal Title</label>
+                    <input 
+                      type="text"
+                      className="input w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100"
+                      placeholder="e.g. Pedestrian Walkway on Southwark St"
+                      value={proposalForm.title}
+                      onChange={(e) => setProposalForm(prev => ({ ...prev, title: e.target.value }))}
+                      disabled={isSubmittingProposal}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">Category</label>
+                      <select 
+                        className="input w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100"
+                        value={proposalForm.category}
+                        onChange={(e) => setProposalForm(prev => ({ ...prev, category: e.target.value }))}
+                        disabled={isSubmittingProposal}
+                      >
+                        <option value="Roads & Bridges">Roads &amp; Bridges</option>
+                        <option value="Utilities & Lighting">Utilities &amp; Lighting</option>
+                        <option value="Environmental">Environmental</option>
+                        <option value="Transit & Trains">Transit &amp; Trains</option>
+                        <option value="Social Services">Social Services</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">District</label>
+                      <select 
+                        className="input w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100"
+                        value={proposalForm.district}
+                        onChange={(e) => setProposalForm(prev => ({ ...prev, district: e.target.value }))}
+                        disabled={isSubmittingProposal}
+                      >
+                        <option value="Westminster">Westminster</option>
+                        <option value="Camden">Camden</option>
+                        <option value="Lambeth">Lambeth</option>
+                        <option value="Southwark">Southwark</option>
+                        <option value="Islington">Islington</option>
+                        <option value="Hackney">Hackney</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-1">Project Description</label>
+                    <textarea 
+                      className="input w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-100 h-28 resize-none"
+                      placeholder="Describe your proposal in detail (safety benefits, location, community impact)..."
+                      value={proposalForm.description}
+                      onChange={(e) => setProposalForm(prev => ({ ...prev, description: e.target.value }))}
+                      disabled={isSubmittingProposal}
+                      required
+                    />
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    className="btn-3d btn-primary w-full py-2.5 flex items-center justify-center gap-2 text-xs"
+                    disabled={isSubmittingProposal}
+                  >
+                    {isSubmittingProposal ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                        <span>AI Planner Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Submit Proposal</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right Column: Live Proposals list & Metrics */}
+              <div className="xl:col-span-2 flex flex-col gap-6">
+                
+                {/* Proposals Global Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase block tracking-wider">Total Proposals</span>
+                    <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1 block">{proposals.length}</span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase block tracking-wider">Average Feasibility</span>
+                    <span className="text-2xl font-black text-emerald-500 mt-1 block">
+                      {proposals.length > 0 ? Math.round(proposals.reduce((acc, curr) => acc + curr.feasibility, 0) / proposals.length) : 0}%
+                    </span>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-slate-450 uppercase block tracking-wider">Est. Budget Pool</span>
+                    <span className="text-2xl font-black text-amber-500 mt-1 block">
+                      £{(proposals.reduce((acc, curr) => acc + (curr.cost_estimate || 0), 0) / 1000).toFixed(0)}K
+                    </span>
+                  </div>
+                </div>
+
+                {/* Proposals Feed List */}
+                <div className="card">
+                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                    <h3 className="card-title">📣 Active Citizen Proposals</h3>
+                    <span className="card-subtitle">Support and track crowdsourced suggestions from different districts</span>
+                  </div>
+
+                  <div className="flex flex-col gap-4 max-h-[550px] overflow-y-auto pr-1">
+                    {proposals.length > 0 ? (
+                      proposals.map(prop => {
+                        const scoreColor = prop.feasibility >= 80 ? 'text-emerald-500 bg-emerald-500/10' : prop.feasibility >= 65 ? 'text-amber-500 bg-amber-500/10' : 'text-red-500 bg-red-500/10';
+                        const scoreBarColor = prop.feasibility >= 80 ? 'bg-emerald-500' : prop.feasibility >= 65 ? 'bg-amber-500' : 'bg-red-500';
+                        
+                        const verdictStyles = {
+                          "Approved for Pilot": "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30",
+                          "Passed with Amendment": "bg-sky-100 text-sky-800 dark:bg-sky-950/40 dark:text-sky-400 border-sky-200 dark:border-sky-900/30",
+                          "Deferred for Study": "bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-400 border-amber-200 dark:border-amber-900/30",
+                          "Rejected due to Cost": "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-400 border-rose-200 dark:border-rose-900/30",
+                          "Pending Debate": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-355 border-slate-200 dark:border-slate-750"
+                        };
+                        const verdictClass = verdictStyles[prop.senate_result] || verdictStyles["Pending Debate"];
+
+                        return (
+                          <div key={prop.id} className="p-4 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-900/40 transition-all flex flex-col gap-3">
+                            
+                            {/* Proposal Header */}
+                            <div className="flex justify-between items-start gap-4">
+                              <div>
+                                <span className="text-[10px] font-bold text-indigo-500 font-mono block mb-0.5">{prop.id}</span>
+                                <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 leading-snug">{prop.title}</h4>
+                              </div>
+
+                              <button 
+                                onClick={() => handleProposalUpvote(prop.id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-850 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:border-rose-300 dark:hover:border-rose-900/30 text-slate-500 hover:text-rose-500 transition-all cursor-pointer"
+                              >
+                                <span className="text-[11px] font-extrabold font-mono">❤️ {prop.upvotes}</span>
+                              </button>
+                            </div>
+
+                            {/* Description text */}
+                            <p className="text-[11px] text-slate-500 leading-relaxed dark:text-slate-400">{prop.description}</p>
+
+                            {/* Tags Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-slate-200/40 dark:border-slate-800/40">
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-semibold">Location / Category</span>
+                                <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300 block truncate">{prop.district} • {prop.category}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-semibold">Est. Capital Required</span>
+                                <span className="text-[10px] font-black text-amber-600 block">£{prop.cost_estimate?.toLocaleString() || 'TBD'}</span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-semibold">Sentiment Index</span>
+                                <span className={`text-[10px] font-bold block ${
+                                  prop.sentiment === 'Favorable' ? 'text-emerald-500' : prop.sentiment === 'Unfavorable' ? 'text-rose-500' : 'text-amber-500'
+                                }`}>
+                                  {prop.sentiment}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[9px] text-slate-400 block font-semibold">Senate Chamber Decision</span>
+                                <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded border mt-0.5 ${verdictClass}`}>
+                                  {prop.senate_result}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Feasibility progress bar indicator */}
+                            <div className="pt-2 flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex justify-between items-center text-[9px] mb-1">
+                                  <span className="font-bold text-slate-400">FEASIBILITY CONFIDENCE</span>
+                                  <span className="font-extrabold text-slate-650 dark:text-slate-350">{prop.feasibility}%</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div className={`h-full ${scoreBarColor} rounded-full`} style={{ width: `${prop.feasibility}%` }}></div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Feasibility report statement from AI */}
+                            {prop.analysis && (
+                              <div className="mt-2 p-2.5 bg-slate-100/50 dark:bg-slate-950/40 rounded-lg border border-slate-200/20 dark:border-slate-800/20">
+                                <span className="text-[9px] font-bold text-indigo-500 uppercase tracking-wide block mb-0.5">AI Feasibility Audit:</span>
+                                <p className="text-[10px] text-slate-500 leading-normal italic">"{prop.analysis}"</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-12 text-slate-450">
+                        <span className="text-3xl block mb-2">💡</span>
+                        <p className="text-sm font-semibold">No community proposals registered yet.</p>
+                        <p className="text-xs text-slate-450 mt-1">Submit your first community project using the planner form on the left.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
             </div>
           )}
 
