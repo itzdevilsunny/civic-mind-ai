@@ -990,32 +990,31 @@ export default function App() {
             <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
             <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isBackendOnline ? 'API Sync Live' : 'Fallback Sandbox'}</span>
           </div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '6px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#9ca3af', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
-            >
-              {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
-              <span>{isDarkMode ? 'Light' : 'Dark'}</span>
-            </button>
-            <button
-              onClick={downloadAuditPdf}
-              title="Export Audit PDF"
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '6px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#9ca3af', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              <span>PDF</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#9ca3af', cursor: 'pointer', fontSize: '12px', fontWeight: 600, boxSizing: 'border-box' }}
+          >
+            {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
+            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
+          <button
+            onClick={downloadAuditPdf}
+            title="Export Audit PDF"
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#9ca3af', cursor: 'pointer', fontSize: '12px', fontWeight: 600, boxSizing: 'border-box' }}
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            <span>Export PDF</span>
+          </button>
           <button
             onClick={handleSignOut}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #e11d48, #be123c)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 700, width: '100%' }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #e11d48, #be123c)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 700, boxSizing: 'border-box' }}
           >
             <LogOut className="w-3.5 h-3.5" />
             <span>Sign Out</span>
           </button>
         </div>
+
       </nav>
 
       {/* Top bar — user info + language + notifications only (no tab navigation) */}

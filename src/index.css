@@ -60,7 +60,7 @@
 
 /* SIDEBAR LUXURY 2-COLOR UPGRADE */
 .sidebar {
-  width: 270px;
+  width: 260px;
   background: linear-gradient(180deg, #111827 0%, #1f2937 100%);
   border-right: 2px solid var(--accent-primary);
   padding: 1.25rem 1rem;
@@ -72,9 +72,10 @@
   top: 0;
   bottom: 0;
   z-index: 9999;
-  transform: translateX(-260px);
-  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateX(-248px);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 4px 0 15px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
 }
 
 .sidebar:hover {
@@ -82,23 +83,24 @@
   box-shadow: 12px 0 45px rgba(0, 0, 0, 0.55);
 }
 
+/* Hover catch zone — extends clickable area past the border */
 .sidebar::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  right: -20px;
-  width: 20px;
+  right: -12px;
+  width: 12px;
   background: transparent;
-  z-index: 9999;
+  z-index: 10000;
 }
 
 .sidebar > * {
-  pointer-events: none; /* Prevent accidental clicks when collapsed */
+  pointer-events: none;
 }
 
 .sidebar:hover > * {
-  pointer-events: auto; /* Enable clicks when expanded */
+  pointer-events: auto;
 }
 
 .sidebar-logo {
@@ -164,7 +166,7 @@
   flex-direction: column;
   min-width: 0;
   background-color: #ffffff;
-  padding-left: 15px;
+  padding-left: 14px; /* matches the visible strip of collapsed sidebar (260 - 248 = 12px + 2px border) */
   transition: var(--transition-smooth);
 }
 
