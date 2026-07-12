@@ -15,7 +15,7 @@ import {
   Volume2,
   FileDown,
   HeartPulse,
-  PoundSterling,
+  IndianRupee,
   Lightbulb,
   Bell,
   Network,
@@ -35,38 +35,41 @@ import CityBudget from './components/CityBudget';
 import NotificationCenter from './components/NotificationCenter';
 import PredictiveMaintenance from './components/PredictiveMaintenance';
 import AgentTimeline from './components/AgentTimeline';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import { CITIES_BY_STATE, getCityByValue } from './config/indianCities';
+import { t } from './config/i18n';
 
 const initialTickets = [
   {
-    id: 'LND-9482',
-    title: 'Pothole on Piccadilly Circus roundabout',
+    id: 'CMI-0101',
+    title: 'Pothole on SV Road near Bandra station',
     category: 'Roads & Bridges',
     priority: 'Medium',
     status: 'In Progress',
-    department: 'Transport for London',
-    officer: 'Marcus Vance',
+    department: 'Roads & Bridges Dept.',
+    officer: 'Rajesh Sharma',
     submittedAt: 'Jul 06, 2026, 09:30 AM',
     stage: 3
   },
   {
-    id: 'LND-9388',
-    title: 'Water main leakage near Hyde Park exit',
+    id: 'CMI-0102',
+    title: 'Water main leakage near Juhu Beach road',
     category: 'Utilities & Lighting',
     priority: 'High',
     status: 'Resolved',
-    department: 'Thames Water',
-    officer: 'Elena Rostova',
+    department: 'Power & Water Dept.',
+    officer: 'Priya Nair',
     submittedAt: 'Jul 05, 2026, 02:15 PM',
     stage: 4
   },
   {
-    id: 'LND-9210',
-    title: 'Flickering streetlights outside Senior Care Center',
+    id: 'CMI-0103',
+    title: 'Flickering streetlights near Borivali Senior Care Centre',
     category: 'Utilities & Lighting',
     priority: 'Critical',
     status: 'Assigned',
-    department: 'Power Grid Commission',
-    officer: 'Julian Drake',
+    department: 'Power & Water Dept.',
+    officer: 'Arjun Menon',
     submittedAt: 'Jul 06, 2026, 06:45 PM',
     stage: 2
   }
@@ -81,6 +84,11 @@ export default function App() {
   const [activeIncident, setActiveIncident] = useState(null);
   const [isBackendOnline, setIsBackendOnline] = useState(false);
   
+  // City & Language state
+  const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('civicmind_city') || 'mumbai');
+  const [selectedLang, setSelectedLang] = useState(() => localStorage.getItem('civicmind_lang') || 'en');
+  const cityInfo = getCityByValue(selectedCity);
+
   const [copilotBtnPos, setCopilotBtnPos] = useState({ x: 800, y: 500 });
   const posRef = useRef({ x: 800, y: 500 });
   posRef.current = copilotBtnPos;
@@ -201,7 +209,7 @@ export default function App() {
     setSystemLogs(prev => [`Citizen Agent: Generating and exporting municipal audit PDF...`, ...prev]);
     const link = document.createElement('a');
     link.href = '/api/audit/pdf';
-    link.download = 'london_municipal_audit_report.pdf';
+    link.download = `${cityInfo.label.replace(/ /g,'_').toLowerCase()}_civic_audit_report.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -238,18 +246,21 @@ export default function App() {
     "Safety Agent: OpenStreetMap interactive node layers ready."
   ]);
 
-  // Load all live APIs from proxy endpoints
+  // Load all live APIs from proxy endpoints — passes city lat/lng/tz so backend fetches real city data
   const loadLiveData = () => {
+    const { lat, lng, tz } = cityInfo;
+    const geoQ = `lat=${lat}&lng=${lng}&tz=${encodeURIComponent(tz)}`;
+    const geoQ2 = `lat=${lat}&lng=${lng}`;
     Promise.all([
-      fetch('/api/live/weather').then(res => res.json()).catch(() => null),
-      fetch('/api/live/aqi').then(res => res.json()).catch(() => null),
+      fetch(`/api/live/weather?${geoQ}`).then(res => res.json()).catch(() => null),
+      fetch(`/api/live/aqi?${geoQ2}`).then(res => res.json()).catch(() => null),
       fetch('/api/live/transport').then(res => res.json()).catch(() => []),
       fetch('/api/live/market').then(res => res.json()).catch(() => null),
       fetch('/api/live/news').then(res => res.json()).catch(() => []),
       fetch('/api/tickets').then(res => res.json()).catch(() => null),
       fetch('/api/telemetry').then(res => res.json()).catch(() => []),
       fetch('/api/actions').then(res => res.json()).catch(() => []),
-      fetch('/api/live/aqi/forecast').then(res => res.json()).catch(() => null),
+      fetch(`/api/live/aqi/forecast?${geoQ2}`).then(res => res.json()).catch(() => null),
       fetch('/api/live/bikepoints').then(res => res.json()).catch(() => null),
       fetch('/api/sustainability/metrics').then(res => res.json()).catch(() => null),
       fetch('/api/proposals').then(res => res.json()).catch(() => [])
@@ -317,9 +328,16 @@ export default function App() {
 
   useEffect(() => {
     loadLiveData();
-    const interval = setInterval(loadLiveData, 30000); // refresh every 30s
+    const interval = setInterval(loadLiveData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  // Re-run when city changes so real data is fetched for new coordinates
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCity]);
+
+  // Persist city preference
+  useEffect(() => {
+    localStorage.setItem('civicmind_city', selectedCity);
+  }, [selectedCity]);
 
   // Handle dark mode toggle
   useEffect(() => {
@@ -410,20 +428,20 @@ export default function App() {
       .catch(err => {
         console.error("Failed to submit ticket to backend:", err);
         const deptMap = {
-          'Roads & Bridges': 'Transport for London',
-          'Utilities & Lighting': 'Thames Water & Power Grid',
-          'Public Safety': 'Metropolitan Police Service',
-          'Environmental': 'London Environment Agency',
-          'Transport': 'Transport for London',
-          'Social Services': 'London Borough Services',
+          'Roads & Bridges': t('deptRoads', selectedLang),
+          'Utilities & Lighting': t('deptUtilities', selectedLang),
+          'Public Safety': t('deptPolice', selectedLang),
+          'Environmental': t('deptEnv', selectedLang),
+          'Transport': t('deptTransport', selectedLang),
+          'Social Services': t('deptSocial', selectedLang),
         };
         const fallbackTicket = {
-          id: `LND-${Math.random().toString(16).slice(2,6).toUpperCase()}`,
+          id: `CMI-${Math.random().toString(16).slice(2,6).toUpperCase()}`,
           title: complaintForm.title,
           category: complaintForm.category,
           priority: complaintForm.priority,
           status: 'Submission Received',
-          department: deptMap[complaintForm.category] || 'London City Council',
+          department: deptMap[complaintForm.category] || `${cityInfo.label} Civic Authority`,
           officer: 'Auto-Assigned',
           submittedAt: new Date().toISOString(),
           stage: 0,
@@ -672,57 +690,57 @@ export default function App() {
         <ul className="sidebar-menu mt-4">
           <li className={`menu-item ${activeTab === 'overview' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('overview')}>
-              <Building2 className="w-4 h-4" /> Overview
+              <Building2 className="w-4 h-4" /> {t('overview', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'transportations' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('transportations')}>
-              <Car className="w-4 h-4" /> Transportations
+              <Car className="w-4 h-4" /> {t('transportations', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'traffic' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('traffic')}>
-              <Camera className="w-4 h-4" /> Traffic & Map
+              <Camera className="w-4 h-4" /> {t('traffic', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'weather' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('weather')}>
-              <CloudSun className="w-4 h-4" /> Weather & Forecast
+              <CloudSun className="w-4 h-4" /> {t('weather', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'news' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('news')}>
-              <FileText className="w-4 h-4" /> News & Media
+              <FileText className="w-4 h-4" /> {t('news', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'others' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('others')}>
-              <Users className="w-4 h-4" /> Actuators & Analytics
+              <Users className="w-4 h-4" /> {t('others', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'pulse' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('pulse')}>
-              <HeartPulse className="w-4 h-4" /> Sentiment Pulse
+              <HeartPulse className="w-4 h-4" /> {t('pulse', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'budget' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('budget')}>
-              <PoundSterling className="w-4 h-4" /> Budget Intelligence
+              <IndianRupee className="w-4 h-4" /> {t('budget', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'proposals' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('proposals')}>
-              <Lightbulb className="w-4 h-4" /> Community Proposals
+              <Lightbulb className="w-4 h-4" /> {t('proposals', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'maintenance' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('maintenance')}>
-              <Wrench className="w-4 h-4" /> Predictive Maint.
+              <Wrench className="w-4 h-4" /> {t('maintenance', selectedLang)}
             </button>
           </li>
           <li className={`menu-item ${activeTab === 'agentlog' ? 'active' : ''}`}>
             <button onClick={() => setActiveTab('agentlog')}>
-              <Network className="w-4 h-4" /> Agent Log
+              <Network className="w-4 h-4" /> {t('agentlog', selectedLang)}
             </button>
           </li>
         </ul>
@@ -762,16 +780,27 @@ export default function App() {
         {/* HEADER BAR WITH CITY SELECTOR & SEARCH */}
         <header className="header-bar">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-sm text-slate-800 dark:text-slate-200">Change City:</span>
-              <select className="form-input py-1 text-xs font-semibold" style={{ width: 'auto' }}>
-                <option value="london">London (United Kingdom)</option>
+          <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-slate-800 dark:text-slate-200">{t('changeCity', selectedLang)}:</span>
+              <select
+                className="form-input py-1 text-xs font-semibold"
+                style={{ width: 'auto', maxWidth: '200px' }}
+                value={selectedCity}
+                onChange={e => setSelectedCity(e.target.value)}
+              >
+                {Object.entries(CITIES_BY_STATE).sort(([a],[b]) => a.localeCompare(b)).map(([state, cities]) => (
+                  <optgroup key={state} label={state}>
+                    {cities.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </optgroup>
+                ))}
               </select>
             </div>
             <div className="relative">
               <input 
                 type="text" 
-                placeholder="Search ticket, cameras..." 
+                placeholder={t('search', selectedLang)}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="form-input py-1 text-xs" 
@@ -803,6 +832,12 @@ export default function App() {
                   }}>{alerts.filter(a => !a.read).length}</span>
                 )}
               </button>
+              <LanguageSwitcher
+                selectedLang={selectedLang}
+                onLangChange={setSelectedLang}
+                isDarkMode={isDarkMode}
+              />
+
               <button
                 onClick={toggleVoiceBriefing}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold font-sans transition-all duration-300 ${
@@ -817,7 +852,7 @@ export default function App() {
                 ) : (
                   <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
                 )}
-                <span>{isSpeaking ? "Stop Briefing" : "Play Voice Briefing"}</span>
+                <span>{isSpeaking ? "Stop Briefing" : t('voiceBriefing', selectedLang)}</span>
               </button>
               
               <div className="flex items-center gap-1.5">

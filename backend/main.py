@@ -476,9 +476,63 @@ def health_check():
         "live_gemini": gemini_available
     }
 
+# Indian city lookup table (for /api/cities reference)
+INDIA_CITY_LIST = [
+    {"value":"mumbai","label":"Mumbai","state":"Maharashtra","lat":19.0760,"lng":72.8777,"tz":"Asia/Kolkata"},
+    {"value":"delhi","label":"New Delhi","state":"Delhi","lat":28.6139,"lng":77.2090,"tz":"Asia/Kolkata"},
+    {"value":"bengaluru","label":"Bengaluru","state":"Karnataka","lat":12.9716,"lng":77.5946,"tz":"Asia/Kolkata"},
+    {"value":"chennai","label":"Chennai","state":"Tamil Nadu","lat":13.0827,"lng":80.2707,"tz":"Asia/Kolkata"},
+    {"value":"hyderabad","label":"Hyderabad","state":"Telangana","lat":17.3850,"lng":78.4867,"tz":"Asia/Kolkata"},
+    {"value":"kolkata","label":"Kolkata","state":"West Bengal","lat":22.5726,"lng":88.3639,"tz":"Asia/Kolkata"},
+    {"value":"pune","label":"Pune","state":"Maharashtra","lat":18.5204,"lng":73.8567,"tz":"Asia/Kolkata"},
+    {"value":"ahmedabad","label":"Ahmedabad","state":"Gujarat","lat":23.0225,"lng":72.5714,"tz":"Asia/Kolkata"},
+    {"value":"jaipur","label":"Jaipur","state":"Rajasthan","lat":26.9124,"lng":75.7873,"tz":"Asia/Kolkata"},
+    {"value":"lucknow","label":"Lucknow","state":"Uttar Pradesh","lat":26.8467,"lng":80.9462,"tz":"Asia/Kolkata"},
+    {"value":"surat","label":"Surat","state":"Gujarat","lat":21.1702,"lng":72.8311,"tz":"Asia/Kolkata"},
+    {"value":"kanpur","label":"Kanpur","state":"Uttar Pradesh","lat":26.4499,"lng":80.3319,"tz":"Asia/Kolkata"},
+    {"value":"nagpur","label":"Nagpur","state":"Maharashtra","lat":21.1458,"lng":79.0882,"tz":"Asia/Kolkata"},
+    {"value":"visakhapatnam","label":"Visakhapatnam","state":"Andhra Pradesh","lat":17.6868,"lng":83.2185,"tz":"Asia/Kolkata"},
+    {"value":"bhopal","label":"Bhopal","state":"Madhya Pradesh","lat":23.2599,"lng":77.4126,"tz":"Asia/Kolkata"},
+    {"value":"patna","label":"Patna","state":"Bihar","lat":25.5941,"lng":85.1376,"tz":"Asia/Kolkata"},
+    {"value":"kochi","label":"Kochi","state":"Kerala","lat":9.9312,"lng":76.2673,"tz":"Asia/Kolkata"},
+    {"value":"coimbatore","label":"Coimbatore","state":"Tamil Nadu","lat":11.0168,"lng":76.9558,"tz":"Asia/Kolkata"},
+    {"value":"indore","label":"Indore","state":"Madhya Pradesh","lat":22.7196,"lng":75.8577,"tz":"Asia/Kolkata"},
+    {"value":"guwahati","label":"Guwahati","state":"Assam","lat":26.1445,"lng":91.7362,"tz":"Asia/Kolkata"},
+    {"value":"chandigarh","label":"Chandigarh","state":"Chandigarh UT","lat":30.7333,"lng":76.7794,"tz":"Asia/Kolkata"},
+    {"value":"ranchi","label":"Ranchi","state":"Jharkhand","lat":23.3441,"lng":85.3096,"tz":"Asia/Kolkata"},
+    {"value":"thiruvananthapuram","label":"Thiruvananthapuram","state":"Kerala","lat":8.5241,"lng":76.9366,"tz":"Asia/Kolkata"},
+    {"value":"bhubaneswar","label":"Bhubaneswar","state":"Odisha","lat":20.2961,"lng":85.8245,"tz":"Asia/Kolkata"},
+    {"value":"dehradun","label":"Dehradun","state":"Uttarakhand","lat":30.3165,"lng":78.0322,"tz":"Asia/Kolkata"},
+    {"value":"srinagar","label":"Srinagar","state":"J&K (UT)","lat":34.0837,"lng":74.7973,"tz":"Asia/Kolkata"},
+    {"value":"shimla","label":"Shimla","state":"Himachal Pradesh","lat":31.1048,"lng":77.1734,"tz":"Asia/Kolkata"},
+    {"value":"raipur","label":"Raipur","state":"Chhattisgarh","lat":21.2514,"lng":81.6296,"tz":"Asia/Kolkata"},
+    {"value":"vadodara","label":"Vadodara","state":"Gujarat","lat":22.3072,"lng":73.1812,"tz":"Asia/Kolkata"},
+    {"value":"amritsar","label":"Amritsar","state":"Punjab","lat":31.6340,"lng":74.8723,"tz":"Asia/Kolkata"},
+    {"value":"varanasi","label":"Varanasi","state":"Uttar Pradesh","lat":25.3176,"lng":82.9739,"tz":"Asia/Kolkata"},
+    {"value":"agra","label":"Agra","state":"Uttar Pradesh","lat":27.1767,"lng":78.0081,"tz":"Asia/Kolkata"},
+    {"value":"madurai","label":"Madurai","state":"Tamil Nadu","lat":9.9252,"lng":78.1198,"tz":"Asia/Kolkata"},
+    {"value":"panaji","label":"Panaji","state":"Goa","lat":15.4909,"lng":73.8278,"tz":"Asia/Kolkata"},
+    {"value":"imphal","label":"Imphal","state":"Manipur","lat":24.8170,"lng":93.9368,"tz":"Asia/Kolkata"},
+    {"value":"shillong","label":"Shillong","state":"Meghalaya","lat":25.5788,"lng":91.8933,"tz":"Asia/Kolkata"},
+    {"value":"jammu","label":"Jammu","state":"J&K (UT)","lat":32.7266,"lng":74.8570,"tz":"Asia/Kolkata"},
+    {"value":"jodhpur","label":"Jodhpur","state":"Rajasthan","lat":26.2389,"lng":73.0243,"tz":"Asia/Kolkata"},
+    {"value":"gurgaon","label":"Gurugram","state":"Haryana","lat":28.4595,"lng":77.0266,"tz":"Asia/Kolkata"},
+    {"value":"mysuru","label":"Mysuru","state":"Karnataka","lat":12.2958,"lng":76.6394,"tz":"Asia/Kolkata"},
+]
+
+@app.get("/api/cities")
+def get_cities():
+    """Returns the full list of Indian cities with coordinates."""
+    return {"cities": INDIA_CITY_LIST}
+
 @app.get("/api/live/weather")
-def get_live_weather():
-    url = "https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FLondon"
+def get_live_weather(lat: float = 19.0760, lng: float = 72.8777, tz: str = "Asia/Kolkata"):
+    """Fetch real-time weather for any city by lat/lng from Open-Meteo (free API)."""
+    import urllib.parse
+    tz_enc = urllib.parse.quote(tz, safe="")
+    url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}"
+           f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m"
+           f"&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone={tz_enc}")
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
@@ -486,42 +540,45 @@ def get_live_weather():
     except Exception as e:
         print(f"Error fetching live weather: {e}")
     
-    # 7-day sensible fallback
+    # Sensible India-appropriate fallback
     return {
         "current": {
-            "temperature_2m": 16.2,
-            "relative_humidity_2m": 72,
-            "apparent_temperature": 15.5,
+            "temperature_2m": 30.5,
+            "relative_humidity_2m": 68,
+            "apparent_temperature": 35.2,
             "precipitation": 0.0,
             "rain": 0.0,
-            "weather_code": 3,
-            "wind_speed_10m": 12.5,
-            "wind_direction_10m": 220
+            "weather_code": 2,
+            "wind_speed_10m": 14.0,
+            "wind_direction_10m": 225
         },
         "daily": {
             "time": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-            "temperature_2m_max": [22.2, 23.5, 21.0, 19.8, 22.0, 24.5, 25.0],
-            "temperature_2m_min": [12.0, 13.5, 11.0, 10.5, 12.0, 14.0, 15.0],
-            "weather_code": [3, 1, 2, 80, 3, 0, 1]
+            "temperature_2m_max": [34.0, 35.2, 33.8, 36.0, 34.5, 32.0, 33.0],
+            "temperature_2m_min": [25.0, 26.0, 24.5, 27.0, 25.5, 23.0, 24.0],
+            "weather_code": [2, 1, 3, 80, 2, 0, 1]
         }
     }
 
 @app.get("/api/live/aqi")
-def get_live_aqi():
-    url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=51.5074&longitude=-0.1278&current=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone"
+def get_live_aqi(lat: float = 19.0760, lng: float = 72.8777):
+    """Fetch real-time AQI for any city by lat/lng from Open-Meteo Air Quality API (free)."""
+    url = (f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lng}"
+           f"&current=pm2_5,pm10,nitrogen_dioxide,sulphur_dioxide,ozone")
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             return res.json()
     except Exception as e:
         print(f"Error fetching live AQI: {e}")
+    # India-appropriate fallback (slightly higher than London average)
     return {
         "current": {
-            "pm2_5": 12.0,
-            "pm10": 18.5,
-            "nitrogen_dioxide": 22.1,
-            "sulphur_dioxide": 4.2,
-            "ozone": 34.0
+            "pm2_5": 38.5,
+            "pm10": 62.0,
+            "nitrogen_dioxide": 41.3,
+            "sulphur_dioxide": 9.8,
+            "ozone": 52.4
         }
     }
 
@@ -558,7 +615,7 @@ def get_sustainability_metrics():
     renewable_mix = min(92, max(12, round(35 + (solar_efficiency * 0.4) - (precipitation * 6))))
     
     # District Green Health Rank (100 is best)
-    districts = ["Westminster", "Camden", "Lambeth", "Southwark", "Islington", "Hackney"]
+    districts = ["Zone A", "Zone B", "Zone C", "Zone D", "Zone E", "Zone F"]
     district_ranks = []
     
     # Map categories to departments to find environmental tickets
@@ -610,7 +667,7 @@ Provide exactly 3 climate recommendations. Return only JSON, no markdown."""
     except Exception as e:
         logger.warning(f"/api/sustainability/metrics Gemini error (using fallback): {e}")
         ai_sustainability = {
-            "sustainability_summary": f"London renewable grid mix is at {renewable_mix}%, driven by an active solar microgrid output of {solar_output} MW. Overall municipal emissions are stabilized, though local AQI levels require targeted green zones.",
+            "sustainability_summary": f"City renewable grid mix is at {renewable_mix}%, driven by an active solar microgrid output of {solar_output} MW. Overall municipal emissions are stabilized, though local AQI levels require targeted green zones.",
             "climate_risk_level": "Medium" if renewable_mix < 40 else "Low",
             "recommendations": [
                 {"title": "Expand Green Zone Corridors", "description": "Introduce tree-lined cycles paths and low-emission pedestrian grids to lower localized PM2.5 rates.", "impact": "Reduce local air toxicity by 18%", "priority": "High", "cost": "Medium"},
@@ -630,12 +687,12 @@ Provide exactly 3 climate recommendations. Return only JSON, no markdown."""
     }
 
 @app.get("/api/live/aqi/forecast")
-def get_aqi_forecast():
+def get_aqi_forecast(lat: float = 19.0760, lng: float = 72.8777):
     """
-    Fetches the 7-day hourly air quality forecast from Open-Meteo Air Quality API
-    and groups it into daily averages to render a clean, live predictive forecast.
+    Fetches the 7-day hourly air quality forecast from Open-Meteo Air Quality API for any city.
     """
-    url = "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=51.5074&longitude=-0.1278&hourly=pm2_5,pm10,nitrogen_dioxide&forecast_days=7"
+    url = (f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lng}"
+           f"&hourly=pm2_5,pm10,nitrogen_dioxide&forecast_days=7")
     try:
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
@@ -682,11 +739,12 @@ def get_aqi_forecast():
     except Exception as e:
         logger.error(f"Error fetching AQI forecast: {e}", exc_info=True)
         
+    # India-appropriate fallback AQI values
     return {
         "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-        "pm2_5": [12.4, 14.2, 18.1, 11.5, 9.8, 15.0, 8.4],
-        "pm10": [18.2, 21.0, 24.5, 17.1, 15.2, 22.0, 14.1],
-        "nitrogen_dioxide": [24.0, 28.2, 32.0, 21.5, 18.0, 30.1, 22.4]
+        "pm2_5": [38.4, 42.2, 55.1, 33.5, 29.8, 47.0, 35.4],
+        "pm10": [62.2, 70.0, 88.5, 58.1, 51.2, 76.0, 60.1],
+        "nitrogen_dioxide": [40.0, 48.2, 55.0, 38.5, 33.0, 50.1, 42.4]
     }
 
 @app.get("/api/live/transport")
