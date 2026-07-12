@@ -954,35 +954,82 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Top Hover Navigation Bar */}
+      {/* Left Hover-Reveal Sidebar Navigation */}
+      <nav className="sidebar">
+        <div className="sidebar-logo">
+          <span>🏙️</span>
+          <span>CivicMind AI</span>
+        </div>
+
+        {/* User Profile */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1.25rem', padding: '8px 10px', borderRadius: '10px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <img src={userProfile.avatar} alt={userProfile.name} style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px solid #f97316', objectFit: 'cover', flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{userProfile.name}</div>
+            <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>{userProfile.role}</div>
+          </div>
+        </div>
+
+        <ul className="sidebar-menu">
+          {TABS.filter(tab => !tab.adminOnly || userRole === 'admin').map(tab => {
+            const TabIcon = tab.icon;
+            return (
+              <li key={tab.id} className={`menu-item ${activeTab === tab.id ? 'active' : ''}`}>
+                <button onClick={() => setActiveTab(tab.id)}>
+                  <TabIcon className="w-4 h-4" />
+                  <span>{t(tab.labelKey, selectedLang)}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Sidebar Footer Actions */}
+        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 8px' }}>
+            <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
+            <span style={{ fontSize: '9px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{isBackendOnline ? 'API Sync Live' : 'Fallback Sandbox'}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '6px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#9ca3af', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            >
+              {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
+              <span>{isDarkMode ? 'Light' : 'Dark'}</span>
+            </button>
+            <button
+              onClick={downloadAuditPdf}
+              title="Export Audit PDF"
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', padding: '6px 8px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#9ca3af', cursor: 'pointer', fontSize: '11px', fontWeight: 600 }}
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>PDF</span>
+            </button>
+          </div>
+          <button
+            onClick={handleSignOut}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px', borderRadius: '8px', border: 'none', background: 'linear-gradient(135deg, #e11d48, #be123c)', color: 'white', cursor: 'pointer', fontSize: '12px', fontWeight: 700, width: '100%' }}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Sign Out</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Top bar — user info + language + notifications only (no tab navigation) */}
       <div className={`top-navbar-container ${isTopNavVisible ? 'visible' : ''}`}>
         <div className="top-navbar-content">
           <div className="top-nav-logo">
             <span>🏙️ CivicMind AI</span>
           </div>
-
-          <ul className="top-nav-menu">
-            {TABS.filter(tab => !tab.adminOnly || userRole === 'admin').map(tab => {
-              const TabIcon = tab.icon;
-              return (
-                <li key={tab.id} className={`top-nav-item ${activeTab === tab.id ? 'active' : ''}`}>
-                  <button onClick={() => { setActiveTab(tab.id); setIsTopNavVisible(false); }}>
-                    <TabIcon className="w-3.5 h-3.5" />
-                    <span>{t(tab.labelKey, selectedLang)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-
-          <div className="top-nav-actions">
-            <div className="flex items-center gap-1.5 mr-2">
-              <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
-              <span className="text-[8px] font-bold text-slate-450 uppercase hidden lg:inline font-mono">
-                {isBackendOnline ? 'API Sync' : 'Sandbox'}
-              </span>
-            </div>
-
+          <div className="top-nav-actions" style={{ marginLeft: 'auto' }}>
+            <LanguageSwitcher
+              selectedLang={selectedLang}
+              onLangChange={setSelectedLang}
+              isDarkMode={isDarkMode}
+            />
             <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-800/40 border border-slate-700/30">
               <img src={userProfile.avatar} alt={userProfile.name} className="w-5 h-5 rounded-full border border-slate-600" />
               <div className="hidden lg:flex flex-col items-start leading-none">
@@ -990,34 +1037,9 @@ export default function App() {
                 <span className="text-[8px] text-slate-400 mt-0.5 leading-none">{userProfile.role}</span>
               </div>
             </div>
-
-            <LanguageSwitcher
-              selectedLang={selectedLang}
-              onLangChange={setSelectedLang}
-              isDarkMode={isDarkMode}
-            />
-
-            <button 
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-800 text-slate-350 hover:text-white transition-all"
-              style={{ background: 'none', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-              title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-            >
-              {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
-
-            <button 
-              onClick={downloadAuditPdf}
-              className="p-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-800 text-slate-350 hover:text-white transition-all"
-              style={{ background: 'none', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-              title="Export Audit PDF"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-            </button>
-
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 border border-rose-500/30 shadow-md transition-all cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-md transition-all cursor-pointer"
               style={{ cursor: 'pointer', border: 'none' }}
               title="Sign Out"
             >
@@ -1026,9 +1048,6 @@ export default function App() {
             </button>
           </div>
         </div>
-      </div>
-      <div className="top-nav-notch" onClick={() => setIsTopNavVisible(true)}>
-        <span>menu ▾</span>
       </div>
 
       {/* MAIN CONTENT AREA */}
