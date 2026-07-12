@@ -2,44 +2,8 @@ import React, { useState } from 'react';
 import { FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
 
-const initialTickets = [
-  {
-    id: 'MTC-9482',
-    title: 'Pothole on Broadway & 42nd St',
-    category: 'Roads & Bridges',
-    priority: 'Medium',
-    status: 'In Progress',
-    department: 'Department of Transportation',
-    officer: 'Marcus Vance',
-    submittedAt: 'Jul 06, 2026, 09:30 AM',
-    stage: 3 // Officer Dispatched
-  },
-  {
-    id: 'MTC-9388',
-    title: 'Overflowing dumpsters near Central Park West exit',
-    category: 'Sanitation & Waste',
-    priority: 'High',
-    status: 'Resolved',
-    department: 'Environmental Services',
-    officer: 'Elena Rostova',
-    submittedAt: 'Jul 05, 2026, 02:15 PM',
-    stage: 4 // Resolved
-  },
-  {
-    id: 'MTC-9210',
-    title: 'Flickering streetlights outside Senior Care Center',
-    category: 'Utilities & Lighting',
-    priority: 'Critical',
-    status: 'Assigned',
-    department: 'Power Grid Commission',
-    officer: 'Julian Drake',
-    submittedAt: 'Jul 06, 2026, 11:45 AM',
-    stage: 2 // Department Assigned
-  }
-];
-
-export default function WorkflowTracker({ ticketsList = initialTickets, onSelectTicket }) {
-  const [selectedTicket, setSelectedTicket] = useState(ticketsList[0]);
+export default function WorkflowTracker({ ticketsList = [], onSelectTicket }) {
+  const [selectedTicket, setSelectedTicket] = useState(ticketsList[0] || null);
 
   const stages = [
     { name: 'Submission Received', desc: 'Complaint registered by citizen' },
@@ -172,9 +136,10 @@ export default function WorkflowTracker({ ticketsList = initialTickets, onSelect
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs py-12">
+          <div className="flex flex-col items-center justify-center h-full text-slate-400 text-xs py-12 text-center">
             <FileText className="w-10 h-10 mb-2 opacity-50" />
-            <span>Select a ticket from the left panel to trace its resolution progress</span>
+            <span className="font-semibold">No active tickets in the pipeline</span>
+            <span className="text-slate-400 mt-1">Submit a civic complaint above to see it tracked here</span>
           </div>
         )}
       </div>

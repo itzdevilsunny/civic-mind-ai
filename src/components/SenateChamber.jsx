@@ -49,12 +49,14 @@ export default function SenateChamber({ policyParams }) {
       });
   };
 
-  // Convene on initial mount
+  const defaultParams = { busTransit: 15, signalTimer: 10, emergencyTeams: 45, solarFunding: 12, congestionToll: 3 };
+
+  // Convene on initial mount with default sensible params
   useEffect(() => {
-    fetchDebate(policyParams);
+    fetchDebate(policyParams || defaultParams);
   }, []);
 
-  // When policyParams change, auto-convene the debate!
+  // When policyParams change after a simulation run, auto-convene the debate!
   useEffect(() => {
     if (policyParams) {
       fetchDebate(policyParams);

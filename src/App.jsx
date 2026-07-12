@@ -258,14 +258,22 @@ export default function App() {
       })
       .catch(err => {
         console.error("Failed to submit ticket to backend:", err);
+        const deptMap = {
+          'Roads & Bridges': 'Transport for London',
+          'Utilities & Lighting': 'Thames Water & Power Grid',
+          'Public Safety': 'Metropolitan Police Service',
+          'Environmental': 'London Environment Agency',
+          'Transport': 'Transport for London',
+          'Social Services': 'London Borough Services',
+        };
         const fallbackTicket = {
-          id: `LND-${Math.floor(Math.random() * 9000) + 1000}`,
+          id: `LND-${Math.random().toString(16).slice(2,6).toUpperCase()}`,
           title: complaintForm.title,
           category: complaintForm.category,
           priority: complaintForm.priority,
           status: 'Submission Received',
-          department: complaintForm.category === 'Utilities & Lighting' ? 'Thames Water' : 'Transport for London',
-          officer: 'Julian Drake',
+          department: deptMap[complaintForm.category] || 'London City Council',
+          officer: 'Auto-Assigned',
           submittedAt: new Date().toISOString(),
           stage: 0,
           description: complaintForm.description
@@ -828,8 +836,12 @@ export default function App() {
                           onChange={(e) => setComplaintForm(prev => ({ ...prev, category: e.target.value }))}
                           className="form-input"
                         >
-                          <option value="Roads & Bridges">Pavement & Structural Damage</option>
-                          <option value="Utilities & Lighting">Utilities & Electrical Grid</option>
+                          <option value="Roads & Bridges">🛣️ Pavement & Structural Damage</option>
+                          <option value="Utilities & Lighting">💡 Utilities & Electrical Grid</option>
+                          <option value="Public Safety">🛡️ Public Safety & Security</option>
+                          <option value="Environmental">🌿 Environmental & Green Spaces</option>
+                          <option value="Transport">🚌 Transport & Traffic</option>
+                          <option value="Social Services">🤝 Social Services & Housing</option>
                         </select>
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -839,9 +851,10 @@ export default function App() {
                           onChange={(e) => setComplaintForm(prev => ({ ...prev, priority: e.target.value }))}
                           className="form-input"
                         >
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
+                          <option value="Low">🟢 Low</option>
+                          <option value="Medium">🔵 Medium</option>
+                          <option value="High">🟠 High</option>
+                          <option value="Critical">🔴 Critical</option>
                         </select>
                       </div>
                     </div>
@@ -873,23 +886,36 @@ export default function App() {
                   </form>
                 </div>
 
-                {/* Incident commands */}
+                {/* Incident commands - dynamic from urgent tickets */}
                 <div className="card">
                   <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title">Incident Console</h3>
+                    <h3 className="card-title">⚡ Incident Console</h3>
+                    <span className="card-subtitle">High-priority civic alerts requiring action</span>
                   </div>
                   <div className="flex flex-col gap-3">
-                    <div className="p-3 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 rounded-xl">
-                      <span className="text-xs font-bold text-rose-800 dark:text-rose-400 block mb-1">Burst Main Waterloo</span>
-                      <p className="text-[10px] text-slate-500 mb-2">Water main burst reported on Waterloo Road. High risk of local street flood.</p>
-                      <button 
-                        onClick={() => executeCopilotAction("Deploy burst main suction rig to Waterloo")}
-                        className="btn btn-primary py-1 text-xs w-full"
-                        style={{ backgroundColor: '#e11d48' }}
-                      >
-                        Deploy Suction Rig
-                      </button>
-                    </div>
+                    {filteredTickets.filter(t => t.priority === 'Critical' || t.priority === 'High').slice(0, 3).length > 0 ? (
+                      filteredTickets.filter(t => t.priority === 'Critical' || t.priority === 'High').slice(0, 3).map(t => (
+                        <div key={t.id} className={`p-3 rounded-xl border ${t.priority === 'Critical' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'}`}>
+                          <span className={`text-xs font-bold block mb-1 ${t.priority === 'Critical' ? 'text-rose-800 dark:text-rose-400' : 'text-amber-800 dark:text-amber-400'}`}>
+                            {t.priority === 'Critical' ? '🚨' : '⚠️'} {t.id} — {t.title.slice(0, 38)}{t.title.length > 38 ? '...' : ''}
+                          </span>
+                          <p className="text-[10px] text-slate-500 mb-2">{t.department} · Status: {t.status}</p>
+                          <button
+                            onClick={() => executeCopilotAction(`Dispatch emergency response to: ${t.title}`)}
+                            className="btn btn-primary py-1 text-xs w-full"
+                            style={{ backgroundColor: t.priority === 'Critical' ? '#e11d48' : '#d97706' }}
+                          >
+                            🚀 Dispatch Response Unit
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-slate-400">
+                        <div className="text-2xl mb-2">✅</div>
+                        <p className="text-xs font-semibold">All clear — no critical incidents</p>
+                        <p className="text-[10px] text-slate-400 mt-1">High-priority tickets will appear here automatically</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
