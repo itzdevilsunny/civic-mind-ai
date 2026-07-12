@@ -208,12 +208,25 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
     power: true,
     incident: true,
     emergency: true,
-    bikeshare: true
+    bikeshare: true,
+    heatmap: false
   });
+  const [heatmapData, setHeatmapData] = useState([]);
+  const heatmarkersRef = useRef({});
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
+
+  // Fetch heatmap complaint data
+  useEffect(() => {
+    fetch('/api/heatmap/complaints')
+      .then(res => res.json())
+      .then(data => {
+        if (data.districts) setHeatmapData(data.districts);
+      })
+      .catch(err => console.error('Heatmap fetch error:', err));
+  }, []);
 
   // Fetch emergency services on mount
   useEffect(() => {
@@ -285,7 +298,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       updateMarkers(nodes, emergencyServices, bikepointsList);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, emergencyServices, activeLayers, bikepointsList]);
+  }, [nodes, emergencyServices, activeLayers, bikepointsList, heatmapData]);
 
   const updateMarkers = (currentNodes, services, bikepoints) => {
     const map = mapInstanceRef.current;
@@ -458,6 +471,33 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
         `);
 
         markersRef.current[bp.id] = marker;
+      });
+    }
+
+    // 4. Add complaint density heatmap layer
+    Object.values(heatmarkersRef.current).forEach(m => map.removeLayer(m));
+    heatmarkersRef.current = {};
+    if (activeLayers.heatmap && heatmapData.length > 0) {
+      heatmapData.forEach(district => {
+        const count = district.count || 0;
+        const radius = 300 + count * 120;
+        const color = count === 0 ? '#10b981' : count <= 2 ? '#f59e0b' : '#f43f5e';
+        const opacity = count === 0 ? 0.15 : 0.25 + count * 0.07;
+        const circle = window.L.circle([district.lat, district.lng], {
+          radius,
+          color,
+          fillColor: color,
+          fillOpacity: Math.min(opacity, 0.6),
+          weight: 2,
+        }).addTo(map);
+        circle.bindPopup(`
+          <div class="map-marker-popup">
+            <strong style="color:${color}">${district.district}</strong><br/>
+            <span style="font-size:11px">📍 <strong>${count}</strong> active complaint${count !== 1 ? 's' : ''}</span><br/>
+            <span style="font-size:10px;color:#64748b">Top: ${district.top_category}</span>
+          </div>
+        `);
+        heatmarkersRef.current[district.district] = circle;
       });
     }
   };

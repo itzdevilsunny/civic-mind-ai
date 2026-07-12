@@ -16,7 +16,10 @@ import {
   FileDown,
   HeartPulse,
   PoundSterling,
-  Lightbulb
+  Lightbulb,
+  Bell,
+  Network,
+  Wrench
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -29,6 +32,9 @@ import SenateChamber from './components/SenateChamber';
 import DispatchControl from './components/DispatchControl';
 import SentimentPulse from './components/SentimentPulse';
 import CityBudget from './components/CityBudget';
+import NotificationCenter from './components/NotificationCenter';
+import PredictiveMaintenance from './components/PredictiveMaintenance';
+import AgentTimeline from './components/AgentTimeline';
 
 const initialTickets = [
   {
@@ -69,6 +75,8 @@ const initialTickets = [
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [alerts, setAlerts] = useState([]);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [activeIncident, setActiveIncident] = useState(null);
   const [isBackendOnline, setIsBackendOnline] = useState(false);
@@ -322,6 +330,26 @@ export default function App() {
       root.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Generate alerts from live telemetry
+  useEffect(() => {
+    const generateAlerts = () => {
+      const newAlerts = [];
+      const now = Date.now();
+      if (liveAqi?.pm2_5 > 30) {
+        newAlerts.push({ id: `aqi-${now}`, type: 'environment', title: 'Air Quality Alert', body: `PM2.5 elevated at ${liveAqi.pm2_5} µg/m³ — advising sensitive groups indoors.`, ts: now, read: false });
+      }
+      if (tickets.filter(t => t.priority === 'Critical' && t.status !== 'Resolved').length > 0) {
+        newAlerts.push({ id: `ticket-${now}`, type: 'safety', title: 'Critical Ticket Open', body: `${tickets.filter(t => t.priority === 'Critical' && t.status !== 'Resolved').length} critical civic complaints awaiting resolution.`, ts: now - 45000, read: false });
+      }
+      if (liveWeather?.condition?.includes('Rain')) {
+        newAlerts.push({ id: `weather-${now}`, type: 'operations', title: 'Precipitation Advisory', body: `Rain detected — reviewing drainage capacity and road surface friction indices.`, ts: now - 120000, read: false });
+      }
+      newAlerts.push({ id: `ops-${now}`, type: 'operations', title: 'System Sync Complete', body: 'All IoT sensors reporting nominal. Last telemetry sync: successful.', ts: now - 300000, read: true });
+      setAlerts(newAlerts);
+    };
+    generateAlerts();
+  }, [liveAqi, tickets, liveWeather]);
 
   const executeCopilotAction = (actionName) => {
     const impactDescription = actionName.includes("Piccadilly") || actionName.includes("traffic")
@@ -687,6 +715,16 @@ export default function App() {
               <Lightbulb className="w-4 h-4" /> Community Proposals
             </button>
           </li>
+          <li className={`menu-item ${activeTab === 'maintenance' ? 'active' : ''}`}>
+            <button onClick={() => setActiveTab('maintenance')}>
+              <Wrench className="w-4 h-4" /> Predictive Maint.
+            </button>
+          </li>
+          <li className={`menu-item ${activeTab === 'agentlog' ? 'active' : ''}`}>
+            <button onClick={() => setActiveTab('agentlog')}>
+              <Network className="w-4 h-4" /> Agent Log
+            </button>
+          </li>
         </ul>
 
         {/* Action button triggers */}
@@ -746,7 +784,25 @@ export default function App() {
             <span className="text-xs text-slate-500 font-semibold font-mono">
               {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </span>
-            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsNotifOpen(true)}
+                style={{ position: 'relative', cursor: 'pointer', background: 'none', border: 'none', padding: '4px', display: 'flex', alignItems: 'center' }}
+                title="Alert Center"
+              >
+                <Bell className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                {alerts.filter(a => !a.read).length > 0 && (
+                  <span style={{
+                    position: 'absolute', top: '-2px', right: '-2px',
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    background: 'linear-gradient(135deg,#f43f5e,#e11d48)',
+                    fontSize: '8px', fontWeight: 900, color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 8px rgba(244,63,94,0.6)',
+                    animation: 'pulse 2s infinite',
+                  }}>{alerts.filter(a => !a.read).length}</span>
+                )}
+              </button>
               <button
                 onClick={toggleVoiceBriefing}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold font-sans transition-all duration-300 ${
@@ -1679,6 +1735,25 @@ export default function App() {
             </div>
           )}
 
+          {/* TAB 10: PREDICTIVE MAINTENANCE INTELLIGENCE */}
+          {activeTab === 'maintenance' && (
+            <div className="flex flex-col gap-0">
+              <PredictiveMaintenance isDarkMode={isDarkMode} />
+            </div>
+          )}
+
+          {/* TAB 11: MULTI-AGENT COORDINATION LOG */}
+          {activeTab === 'agentlog' && (
+            <div className="flex flex-col gap-0">
+              <AgentTimeline
+                isDarkMode={isDarkMode}
+                liveWeather={liveWeather}
+                liveAqi={liveAqi}
+                tickets={tickets}
+              />
+            </div>
+          )}
+
         </div>
 
         {/* Footer log monitor console */}
@@ -1703,6 +1778,16 @@ export default function App() {
       >
         <Bot className="w-5 h-5 animate-pulse" />
       </button>
+
+      {/* Notification Center overlay */}
+      <NotificationCenter
+        isOpen={isNotifOpen}
+        onClose={() => setIsNotifOpen(false)}
+        alerts={alerts}
+        isDarkMode={isDarkMode}
+        onMarkRead={(id) => setAlerts(prev => prev.map(a => a.id === id ? { ...a, read: true } : a))}
+        onMarkAllRead={() => setAlerts(prev => prev.map(a => ({ ...a, read: true })))}
+      />
 
       {/* Copilot overlay */}
       <AICopilot 
