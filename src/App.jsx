@@ -20,7 +20,6 @@ import {
   Bell,
   Network,
   Wrench,
-  LogIn,
   LogOut,
   ChevronLeft,
   ChevronRight
@@ -79,6 +78,20 @@ const initialTickets = [
   }
 ];
 
+const TABS = [
+  { id: 'overview', icon: Building2, labelKey: 'overview', adminOnly: false },
+  { id: 'transportations', icon: Car, labelKey: 'transportations', adminOnly: false },
+  { id: 'traffic', icon: Camera, labelKey: 'traffic', adminOnly: false },
+  { id: 'weather', icon: CloudSun, labelKey: 'weather', adminOnly: false },
+  { id: 'news', icon: FileText, labelKey: 'news', adminOnly: false },
+  { id: 'others', icon: Users, labelKey: 'others', adminOnly: false },
+  { id: 'pulse', icon: HeartPulse, labelKey: 'pulse', adminOnly: false },
+  { id: 'budget', icon: IndianRupee, labelKey: 'budget', adminOnly: false },
+  { id: 'proposals', icon: Lightbulb, labelKey: 'proposals', adminOnly: false },
+  { id: 'maintenance', icon: Wrench, labelKey: 'maintenance', adminOnly: true },
+  { id: 'agentlog', icon: Network, labelKey: 'agentlog', adminOnly: true }
+];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -93,12 +106,39 @@ export default function App() {
   const [selectedLang, setSelectedLang] = useState(() => localStorage.getItem('civicmind_lang') || 'en');
   const cityInfo = getCityByValue(selectedCity);
 
-  // Sign in/out state
+  // Sign in/out and Role state
   const [isSignedIn, setIsSignedIn] = useState(() => localStorage.getItem('civicmind_signed_in') === 'true');
-  const handleSignToggle = () => {
-    const next = !isSignedIn;
-    setIsSignedIn(next);
-    localStorage.setItem('civicmind_signed_in', String(next));
+  const [userRole, setUserRole] = useState(() => localStorage.getItem('civicmind_user_role') || 'citizen');
+  const [isTopNavVisible, setIsTopNavVisible] = useState(false);
+
+  useEffect(() => {
+    const handleMouseMoveGlobal = (e) => {
+      if (e.clientY <= 50) {
+        setIsTopNavVisible(true);
+      } else if (e.clientY > 80) {
+        setIsTopNavVisible(false);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMoveGlobal);
+    return () => window.removeEventListener('mousemove', handleMouseMoveGlobal);
+  }, []);
+
+  const handleSignIn = (role) => {
+    setUserRole(role);
+    setIsSignedIn(true);
+    localStorage.setItem('civicmind_user_role', role);
+    localStorage.setItem('civicmind_signed_in', 'true');
+    if (role === 'citizen' && (activeTab === 'maintenance' || activeTab === 'agentlog')) {
+      setActiveTab('overview');
+    }
+    setSystemLogs(prev => [`System: Logged in successfully as ${role === 'admin' ? 'City Administrator' : 'Active Citizen'}.`, ...prev]);
+  };
+
+  const handleSignOut = () => {
+    setIsSignedIn(false);
+    localStorage.setItem('civicmind_signed_in', 'false');
+    setActiveTab('overview');
+    setSystemLogs(prev => [`System: Logged out from the session.`, ...prev]);
   };
 
   // Tab order for Back/Next navigation
@@ -686,134 +726,310 @@ export default function App() {
     bp.name.toLowerCase().includes(bikeSearchQuery.toLowerCase())
   );
 
+  if (!isSignedIn) {
+    return (
+      <div className="landing-container">
+        {/* Landing Header */}
+        <header className="landing-header">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between" style={{ display: 'flex', width: '100%', boxSizing: 'border-box' }}>
+            <div className="text-xl font-bold flex items-center gap-2" style={{ display: 'flex', alignItems: 'center' }}>
+              <span className="text-2xl">🏙️</span>
+              <span className="font-extrabold tracking-tight bg-gradient-to-r from-blue-600 to-orange-500" style={{ backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '1.25rem' }}>CivicMind AI</span>
+            </div>
+            
+            <div className="flex items-center gap-4" style={{ display: 'flex', alignItems: 'center' }}>
+              <LanguageSwitcher
+                selectedLang={selectedLang}
+                onLangChange={setSelectedLang}
+                isDarkMode={isDarkMode}
+              />
+              
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all"
+                style={{ cursor: 'pointer', background: 'none', border: '1px solid rgba(148, 163, 184, 0.2)', padding: '6px 10px', borderRadius: '6px' }}
+                title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              >
+                {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
+              </button>
+
+              <button
+                onClick={() => handleSignIn('citizen')}
+                className="px-4 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all cursor-pointer"
+                style={{ cursor: 'pointer', padding: '6px 12px', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}
+              >
+                Log In as Citizen
+              </button>
+              
+              <button
+                onClick={() => handleSignIn('admin')}
+                className="px-4 py-2 text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all cursor-pointer"
+                style={{ cursor: 'pointer', padding: '6px 12px', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}
+              >
+                Log In as Admin
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <section className="landing-hero" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="landing-section-tag" style={{ color: '#f97316', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Empowering Smarter Municipal Governance</div>
+          <h1 className="landing-title" style={{ fontSize: '3rem', fontWeight: 850, margin: '1rem 0', lineHeight: 1.2 }}>
+            Civic Decision Intelligence,<br />Driven by Multi-Agent AI
+          </h1>
+          <p className="landing-subtitle" style={{ fontSize: '1.1rem', maxW: '760px', margin: '0 auto 2rem auto', lineHeight: 1.6, color: '#64748b' }}>
+            CivicMind AI connects citizens and administrators through real-time traffic monitoring, predictive environmental sensing, and automated agent dispatching to resolve municipal infrastructure tickets efficiently.
+          </p>
+          
+          <div className="flex justify-center gap-4" style={{ display: 'flex', gap: '15px' }}>
+            <button
+              onClick={() => handleSignIn('citizen')}
+              className="px-6 py-3 font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] transition-all cursor-pointer"
+              style={{ cursor: 'pointer', padding: '12px 24px', border: 'none', borderRadius: '8px', fontWeight: 'bold', color: '#fff', background: 'linear-gradient(135deg, #10b981, #0d9488)' }}
+            >
+              Access Citizen Portal
+            </button>
+            <button
+              onClick={() => handleSignIn('admin')}
+              className="px-6 py-3 font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:shadow-blue-500/20 hover:scale-[1.02] transition-all cursor-pointer"
+              style={{ cursor: 'pointer', padding: '12px 24px', border: 'none', borderRadius: '8px', fontWeight: 'bold', color: '#fff', background: 'linear-gradient(135deg, #3b82f6, #4f46e5)' }}
+            >
+              Access Admin Console
+            </button>
+          </div>
+
+          <div className="landing-hero-image-wrapper" style={{ marginTop: '3rem', maxWidth: '850px', border: '2px solid rgba(226, 232, 240, 0.8)', borderRadius: '12px', overflow: 'hidden' }}>
+            <img 
+              src="/civic_mind_ai_hero.png" 
+              alt="CivicMind AI Hero Dashboard Preview" 
+              className="landing-hero-image" 
+            />
+          </div>
+        </section>
+
+        {/* Features Grid */}
+        <section className="landing-features-section">
+          <div className="landing-section-tag" style={{ color: '#f97316', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Comprehensive Feature Set</div>
+          <h2 className="landing-section-title" style={{ textAlign: 'center', fontSize: '2rem', fontWeight: 800, margin: '1rem 0 3rem 0' }}>How CivicMind AI Helps Your Community</h2>
+          
+          <div className="landing-features-grid" style={{ display: 'grid', gap: '30px' }}>
+            <div className="landing-feature-card">
+              <div className="landing-feature-icon-wrapper">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <h3 className="landing-feature-title">Real-Time City Overview</h3>
+              <p className="landing-feature-desc">
+                Get a unified view of city health metrics, environmental quality, traffic safety scores, and open ticket volumes at a glance. Backed by simulated and live-updated sensor networks.
+              </p>
+            </div>
+
+            <div className="landing-feature-card">
+              <div className="landing-feature-icon-wrapper">
+                <Users className="w-6 h-6" />
+              </div>
+              <h3 className="landing-feature-title">Citizen Proposal & Senate Chamber</h3>
+              <p className="landing-feature-desc">
+                Submit community proposals, gather support through citizen upvotes, and watch as our AI-powered municipal senate debates, votes on, and passes policies automatically.
+              </p>
+              <img 
+                src="/citizen_proposal_mockup.png" 
+                alt="Citizen Proposal Senate Interface" 
+                className="landing-feature-img"
+              />
+            </div>
+
+            <div className="landing-feature-card">
+              <div className="landing-feature-icon-wrapper">
+                <Bot className="w-6 h-6" />
+              </div>
+              <h3 className="landing-feature-title">AI Dispatcher & Copilot Control</h3>
+              <p className="landing-feature-desc">
+                City Administrators can coordinate municipal dispatch workflows using Gemini-powered copilot assistance. Monitor and assign tickets to field crews, optimize traffic lights, or deploy emergency repair crews dynamically.
+              </p>
+              <img 
+                src="/ai_dispatcher_mockup.png" 
+                alt="AI Dispatcher Operations Control" 
+                className="landing-feature-img"
+              />
+            </div>
+
+            <div className="landing-feature-card">
+              <div className="landing-feature-icon-wrapper">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <h3 className="landing-feature-title">City Budget & Sustainability Radar</h3>
+              <p className="landing-feature-desc">
+                Audit city development funds and operational expenses. Track carbon emissions, green energy yields, solar battery capacity, and neighborhood air quality indices using real-time analytics.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Roles Breakdown */}
+        <section className="landing-roles-section">
+          <div className="landing-roles-container">
+            <div className="landing-section-tag" style={{ color: '#f97316', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Role-Based Access</div>
+            <h2 className="landing-section-title" style={{ textAlign: 'center', fontSize: '2rem', fontWeight: 800, margin: '1rem 0 3rem 0' }}>Designed for Both Citizens and Public Servants</h2>
+            
+            <div className="landing-roles-grid" style={{ display: 'grid', gap: '30px' }}>
+              <div className="landing-role-card citizen-border">
+                <span className="landing-role-badge citizen">Citizen Portal</span>
+                <h3 className="text-xl font-extrabold mb-4" style={{ fontSize: '1.25rem', fontWeight: 800 }}>For the Community</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed" style={{ fontSize: '0.9rem', lineHeight: 1.5, color: '#64748b' }}>
+                  Participate actively in municipal development. Report issues like potholes or water leaks, track resolution stages, upvote public infrastructure projects, and view live transit/news channels.
+                </p>
+                <ul className="landing-role-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '0px' }}>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span className="text-emerald-500 font-bold">✔</span>
+                    <span>Submit and track tickets for road repairs or utility leaks</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span className="text-emerald-500 font-bold">✔</span>
+                    <span>Upvote proposals in the Senate Chamber to advocate for your neighborhood</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span className="text-emerald-500 font-bold">✔</span>
+                    <span>View real-time public transit schedules, live weather, and local news</span>
+                  </li>
+                </ul>
+                <button
+                  onClick={() => handleSignIn('citizen')}
+                  className="w-full py-2.5 font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all cursor-pointer"
+                  style={{ cursor: 'pointer', padding: '10px 0', border: 'none', borderRadius: '6px', background: '#10b981', color: 'white', fontWeight: 'bold', width: '100%', marginTop: '20px' }}
+                >
+                  Enter as Citizen
+                </button>
+              </div>
+
+              <div className="landing-role-card admin-border">
+                <span className="landing-role-badge admin">Admin Console</span>
+                <h3 className="text-xl font-extrabold mb-4" style={{ fontSize: '1.25rem', fontWeight: 800 }}>For Municipal Leaders</h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed" style={{ fontSize: '0.9rem', lineHeight: 1.5, color: '#64748b' }}>
+                  Oversee metropolitan performance. Monitor multi-agent communication networks, review system warnings, manage ticket routing, run predictive maintenance simulators, and download audit PDF reports.
+                </p>
+                <ul className="landing-role-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '0px' }}>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span className="text-blue-500 font-bold">✔</span>
+                    <span>Access predictive analytics for electrical grids and water mains</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span className="text-blue-500 font-bold">✔</span>
+                    <span>Direct AI Copilot actions for automatic dispatch of field officers</span>
+                  </li>
+                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                    <span className="text-blue-500 font-bold">✔</span>
+                    <span>Analyze live telemetry from traffic junctions and city cameras</span>
+                  </li>
+                </ul>
+                <button
+                  onClick={() => handleSignIn('admin')}
+                  className="w-full py-2.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all cursor-pointer"
+                  style={{ cursor: 'pointer', padding: '10px 0', border: 'none', borderRadius: '6px', background: '#3b82f6', color: 'white', fontWeight: 'bold', width: '100%', marginTop: '20px' }}
+                >
+                  Enter as Administrator
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Landing Footer */}
+        <footer className="landing-footer" style={{ padding: '3rem 0', textAlign: 'center', background: '#0f172a', color: '#94a3b8' }}>
+          <p className="text-sm">© {new Date().getFullYear()} CivicMind AI Platform. Empowering cities with agents of change.</p>
+        </footer>
+      </div>
+    );
+  }
+
+  const userProfile = userRole === 'admin' ? {
+    name: 'Al-Amin Lousa',
+    role: 'City Administrator',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80'
+  } : {
+    name: 'Pinky Sharma',
+    role: 'Active Citizen',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=80&q=80'
+  };
+
   return (
     <div className="app-container">
-      {/* SIDEBAR */}
-      <aside className="sidebar">
-        <div className="sidebar-logo flex items-center gap-2">
-          <span>🏙️ CivicMind AI</span>
-        </div>
-
-        {/* User profile details matching spec */}
-        <div className="flex flex-col items-center gap-1.5 py-2 border-b border-slate-150/10 mb-2">
-          <div className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 dark:border-slate-800">
-            <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=80&q=80" alt="Al-Amin Lousa" />
+      {/* Top Hover Navigation Bar */}
+      <div className={`top-navbar-container ${isTopNavVisible ? 'visible' : ''}`}>
+        <div className="top-navbar-content">
+          <div className="top-nav-logo">
+            <span>🏙️ CivicMind AI</span>
           </div>
-          <div className="text-center">
-            <div className="font-bold text-[11px] text-slate-800 dark:text-slate-200">Al-Amin Lousa</div>
-            <div className="text-[9px] text-slate-450">City Administrator</div>
+
+          <ul className="top-nav-menu">
+            {TABS.filter(tab => !tab.adminOnly || userRole === 'admin').map(tab => {
+              const TabIcon = tab.icon;
+              return (
+                <li key={tab.id} className={`top-nav-item ${activeTab === tab.id ? 'active' : ''}`}>
+                  <button onClick={() => { setActiveTab(tab.id); setIsTopNavVisible(false); }}>
+                    <TabIcon className="w-3.5 h-3.5" />
+                    <span>{t(tab.labelKey, selectedLang)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="top-nav-actions">
+            <div className="flex items-center gap-1.5 mr-2">
+              <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
+              <span className="text-[8px] font-bold text-slate-450 uppercase hidden lg:inline font-mono">
+                {isBackendOnline ? 'API Sync' : 'Sandbox'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-800/40 border border-slate-700/30">
+              <img src={userProfile.avatar} alt={userProfile.name} className="w-5 h-5 rounded-full border border-slate-600" />
+              <div className="hidden lg:flex flex-col items-start leading-none">
+                <span className="text-[10px] font-bold text-white leading-none">{userProfile.name}</span>
+                <span className="text-[8px] text-slate-400 mt-0.5 leading-none">{userProfile.role}</span>
+              </div>
+            </div>
+
+            <LanguageSwitcher
+              selectedLang={selectedLang}
+              onLangChange={setSelectedLang}
+              isDarkMode={isDarkMode}
+            />
+
+            <button 
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-800 text-slate-350 hover:text-white transition-all"
+              style={{ background: 'none', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+              title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            >
+              {isDarkMode ? <Sun className="w-3.5 h-3.5 text-amber-500" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+
+            <button 
+              onClick={downloadAuditPdf}
+              className="p-1.5 rounded-lg border border-slate-700/50 hover:bg-slate-800 text-slate-350 hover:text-white transition-all"
+              style={{ background: 'none', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+              title="Export Audit PDF"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 border border-rose-500/30 shadow-md transition-all cursor-pointer"
+              style={{ cursor: 'pointer', border: 'none' }}
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Sign Out</span>
+            </button>
           </div>
         </div>
-        
-        <ul className="sidebar-menu mt-4">
-          <li className={`menu-item ${activeTab === 'overview' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('overview')}>
-              <Building2 className="w-4 h-4" /> {t('overview', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'transportations' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('transportations')}>
-              <Car className="w-4 h-4" /> {t('transportations', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'traffic' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('traffic')}>
-              <Camera className="w-4 h-4" /> {t('traffic', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'weather' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('weather')}>
-              <CloudSun className="w-4 h-4" /> {t('weather', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'news' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('news')}>
-              <FileText className="w-4 h-4" /> {t('news', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'others' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('others')}>
-              <Users className="w-4 h-4" /> {t('others', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'pulse' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('pulse')}>
-              <HeartPulse className="w-4 h-4" /> {t('pulse', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'budget' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('budget')}>
-              <IndianRupee className="w-4 h-4" /> {t('budget', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'proposals' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('proposals')}>
-              <Lightbulb className="w-4 h-4" /> {t('proposals', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'maintenance' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('maintenance')}>
-              <Wrench className="w-4 h-4" /> {t('maintenance', selectedLang)}
-            </button>
-          </li>
-          <li className={`menu-item ${activeTab === 'agentlog' ? 'active' : ''}`}>
-            <button onClick={() => setActiveTab('agentlog')}>
-              <Network className="w-4 h-4" /> {t('agentlog', selectedLang)}
-            </button>
-          </li>
-        </ul>
-
-        {/* Action button triggers */}
-        <div className="mt-auto flex flex-col gap-3 pt-4 border-t border-slate-150/10">
-          {/* Sign In / Sign Out button */}
-          <button
-            onClick={handleSignToggle}
-            className="btn-3d flex items-center justify-center gap-2 w-full transition-all duration-300"
-            style={{
-              fontSize: '11px', fontWeight: '700', padding: '8px 12px',
-              borderRadius: '8px', cursor: 'pointer',
-              background: isSignedIn
-                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-                : 'linear-gradient(135deg, #10b981, #059669)',
-              color: 'white',
-              border: isSignedIn ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(16,185,129,0.4)',
-              boxShadow: isSignedIn
-                ? '0 2px 10px rgba(239,68,68,0.3)'
-                : '0 2px 10px rgba(16,185,129,0.3)',
-            }}
-            title={isSignedIn ? 'Sign Out' : 'Sign In'}
-          >
-            {isSignedIn ? <LogOut className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
-            <span>{isSignedIn ? 'Sign Out' : 'Sign In'}</span>
-          </button>
-
-          <button 
-            onClick={() => setIsCopilotOpen(true)}
-            className="btn-3d btn-primary flex items-center justify-center gap-2 w-full"
-          >
-            <Bot className="w-4 h-4 animate-bounce" />
-            <span>Ask AI Copilot</span>
-          </button>
-          
-          <button 
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="btn-3d btn-secondary flex items-center justify-center gap-2"
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.06)', color: '#000000', border: '1px solid rgba(255, 255, 255, 0.12)', width: '100%' }}
-          >
-            {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
-            <span>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
-
-          <button 
-            onClick={downloadAuditPdf}
-            className="btn-3d flex items-center justify-center gap-2 text-white border border-indigo-700/50 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 transition-all duration-300 w-full"
-            style={{ fontSize: '11px', fontWeight: '600', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer' }}
-          >
-            <FileDown className="w-4 h-4 animate-bounce" />
-            <span>Export Audit PDF</span>
-          </button>
-        </div>
-      </aside>
+      </div>
+      <div className="top-nav-notch" onClick={() => setIsTopNavVisible(true)}>
+        <span>menu ▾</span>
+      </div>
 
       {/* MAIN CONTENT AREA */}
       <main className="main-content">
