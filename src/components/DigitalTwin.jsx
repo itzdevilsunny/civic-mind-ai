@@ -12,6 +12,190 @@ const initialNodes = [
   { id: 'incident-1', type: 'incident', name: 'Water Main Burst - Waterloo Road', lat: 51.5033, lon: -0.1123, status: 'Critical', metric: 'Water depth: 15cm | Response team dispatched', color: '#ef4444' }
 ];
 
+function CctvFeed({ node }) {
+  const canvasRef = useRef(null);
+  const [feedMode, setFeedMode] = useState('ai'); // 'ai' or 'thermal'
+  
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animationId;
+    
+    // Simulate objects
+    const objects = [
+      { x: 30, y: 50, vx: 0.8, vy: 0.2, type: 'Pedestrian', score: 91, w: 20, h: 45 },
+      { x: 120, y: 70, vx: -1.2, vy: -0.1, type: 'Car', score: 88, w: 45, h: 30 },
+      { x: 220, y: 40, vx: 0.5, vy: 0.3, type: 'Bicycle', score: 76, w: 25, h: 25 },
+      { x: 80, y: 90, vx: 1.1, vy: -0.2, type: 'Pedestrian', score: 94, w: 18, h: 42 }
+    ];
+    
+    // Thermal gradient particles
+    const heatParticles = Array.from({ length: 40 }, () => ({
+      x: Math.random() * 280,
+      y: Math.random() * 150,
+      r: Math.random() * 15 + 10,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: (Math.random() - 0.5) * 1.5
+    }));
+
+    const render = () => {
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      if (feedMode === 'ai') {
+        // AI detection background: dark cyber green tint
+        ctx.fillStyle = '#05180c';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw grid lines
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.1)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < canvas.width; x += 40) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, canvas.height);
+          ctx.stroke();
+        }
+        for (let y = 0; y < canvas.height; y += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+        
+        // Update & draw AI bounding boxes
+        objects.forEach(obj => {
+          obj.x += obj.vx;
+          obj.y += obj.vy;
+          
+          // Wrap screen
+          if (obj.x > canvas.width) obj.x = -obj.w;
+          if (obj.x < -obj.w) obj.x = canvas.width;
+          if (obj.y > canvas.height) obj.y = -obj.h;
+          if (obj.y < -obj.h) obj.y = canvas.height;
+          
+          // Draw box
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(obj.x, obj.y, obj.w, obj.h);
+          
+          // Draw label background
+          ctx.fillStyle = '#10b981';
+          ctx.fillRect(obj.x, obj.y - 12, obj.w + 12, 12);
+          
+          // Label text
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '8px monospace';
+          ctx.fillText(`${obj.type[0]}:${obj.score}%`, obj.x + 2, obj.y - 3);
+        });
+
+        // Scanline effect
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
+        for (let y = 0; y < canvas.height; y += 4) {
+          ctx.fillRect(0, y, canvas.width, 2);
+        }
+        
+      } else {
+        // Thermal camera background: dark blue/purple
+        ctx.fillStyle = '#020024';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw heat blur points
+        heatParticles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          
+          if (p.x > canvas.width + 20) p.x = -20;
+          if (p.x < -20) p.x = canvas.width + 20;
+          if (p.y > canvas.height + 20) p.y = -20;
+          if (p.y < -20) p.y = canvas.height + 20;
+          
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+          grad.addColorStop(0, 'rgba(255, 60, 0, 0.7)');    // core hot red
+          grad.addColorStop(0.3, 'rgba(255, 200, 0, 0.4)');  // yellow
+          grad.addColorStop(0.6, 'rgba(0, 200, 255, 0.2)');  // cool blue
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+      
+      // OSD overlays
+      ctx.fillStyle = feedMode === 'ai' ? '#10b981' : '#ff3c00';
+      ctx.font = '8px monospace';
+      
+      // REC flashing dot
+      if (Math.floor(Date.now() / 500) % 2 === 0) {
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(10, 10, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText('REC', 18, 13);
+      ctx.fillText(`FPS: 30`, canvas.width - 45, 13);
+      ctx.fillText(`MODE: ${feedMode.toUpperCase()}`, 8, canvas.height - 8);
+      ctx.fillText(`CCTV_${node.id.toUpperCase()}`, canvas.width - 70, canvas.height - 8);
+      
+      animationId = requestAnimationFrame(render);
+    };
+    
+    render();
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, [feedMode, node.id]);
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-150 dark:border-slate-800 flex flex-col gap-2">
+      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Live Camera Vision Feed</span>
+      
+      <div className="relative rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 h-[140px] bg-black">
+        <canvas 
+          ref={canvasRef} 
+          width={350} 
+          height={140} 
+          className="w-full h-full block"
+        />
+        
+        <div className="absolute top-2 left-16 text-[8px] font-mono text-white/70 flex gap-2">
+          <span>ISO 800</span>
+          <span>F/2.8</span>
+          <span>1/60s</span>
+        </div>
+      </div>
+      
+      <div className="flex gap-2 justify-between mt-1">
+        <button 
+          onClick={() => setFeedMode('ai')} 
+          className={`flex-1 text-[10px] font-extrabold py-1.5 px-2 rounded-lg border transition-all ${
+            feedMode === 'ai' 
+              ? 'bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-900/30 dark:text-emerald-400'
+              : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50 dark:bg-slate-850 dark:border-slate-800 dark:text-slate-350 dark:hover:bg-slate-800'
+          }`}
+        >
+          🤖 AI Object Detection
+        </button>
+        <button 
+          onClick={() => setFeedMode('thermal')} 
+          className={`flex-1 text-[10px] font-extrabold py-1.5 px-2 rounded-lg border transition-all ${
+            feedMode === 'thermal' 
+              ? 'bg-rose-100 border-rose-300 text-rose-850 dark:bg-rose-950/40 dark:border-rose-900/30 dark:text-rose-450'
+              : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50 dark:bg-slate-850 dark:border-slate-800 dark:text-slate-355 dark:hover:bg-slate-800'
+          }`}
+        >
+          🔥 Thermal Heatmap
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch, bikepointsList = [] }) {
   const [nodes, setNodes] = useState(nodesList.length > 0 ? nodesList : initialNodes);
   const [emergencyServices, setEmergencyServices] = useState([]);
@@ -377,6 +561,11 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
                 {selectedNode.status}
               </span>
             </div>
+
+            {/* Camera vision details */}
+            {selectedNode.type === 'camera' && (
+              <CctvFeed node={selectedNode} />
+            )}
 
             {/* Bikeshare station details */}
             {selectedNode.type === 'bikeshare' && (
