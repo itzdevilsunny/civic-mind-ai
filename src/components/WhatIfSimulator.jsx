@@ -3,7 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import { Sliders, Cpu, Loader2, Sparkles } from 'lucide-react';
 
 
-export default function WhatIfSimulator() {
+export default function WhatIfSimulator({ onForecastRun }) {
   const [params, setParams] = useState({
     busTransit: 0,       // -20 to +100%
     signalTimer: 0,      // 0 to +60 seconds
@@ -50,6 +50,9 @@ export default function WhatIfSimulator() {
 
   const runAiForecast = () => {
     setLoading(true);
+    if (onForecastRun) {
+      onForecastRun(params);
+    }
     fetch('/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

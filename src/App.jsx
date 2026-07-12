@@ -20,6 +20,7 @@ import AICopilot from './components/AICopilot';
 import WhatIfSimulator from './components/WhatIfSimulator';
 import MultiAgentStatus from './components/MultiAgentStatus';
 import WorkflowTracker from './components/WorkflowTracker';
+import SenateChamber from './components/SenateChamber';
 
 const initialTickets = [
   {
@@ -61,6 +62,7 @@ export default function App() {
   const [liveNews, setLiveNews] = useState([]);
   const [tickets, setTickets] = useState(initialTickets);
   const [telemetry, setTelemetry] = useState([]);
+  const [senatePolicy, setSenatePolicy] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   // Form State
@@ -770,9 +772,10 @@ export default function App() {
 
               </div>
 
-              {/* What-if simulator */}
-              <section>
-                <WhatIfSimulator />
+              {/* What-if simulator & Senate Chamber Grid */}
+              <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <WhatIfSimulator onForecastRun={(params) => setSenatePolicy(params)} />
+                <SenateChamber policyParams={senatePolicy} />
               </section>
 
               {/* Multi-agent status */}

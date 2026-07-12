@@ -325,6 +325,15 @@ class SimulationRequest(BaseModel):
     solarFunding: float
     congestionToll: float
 
+class SenateMessage(BaseModel):
+    agent: str
+    message: str
+    sentiment: str
+
+class SenateDebateResponse(BaseModel):
+    topic: str
+    debate: List[SenateMessage]
+
 # --- Background Task to Simulate Ticket Stepper Pipeline ---
 async def simulate_ticket_pipeline(ticket_id: str):
     """
@@ -1011,6 +1020,74 @@ def run_simulation(payload: SimulationRequest):
         "congestionCurve": math_curve,
         "report": math_report
     }
+
+@app.post("/api/senate/debate")
+def run_senate_debate(payload: SimulationRequest):
+    """
+    Simulates a live round-robin debate between London's AI agents concerning
+    the proposed policy settings or current city incidents.
+    """
+    math_debate = {
+        "topic": f"Evaluating Policy Mix: Transit ({payload.busTransit}%), Signals ({payload.signalTimer}s), Safety ({payload.emergencyTeams} Units), Solar ({payload.solarFunding}M), Toll (£{payload.congestionToll})",
+        "debate": [
+            {
+                "agent": "Traffic Intelligence Agent",
+                "message": f"Increasing bus transit frequency by {payload.busTransit}% and signal offsets by {payload.signalTimer}s will optimize flow rates by 12%. However, the congestion toll of £{payload.congestionToll} is critical to depress peak commuter peaks.",
+                "sentiment": "supportive" if payload.congestionToll > 5 or payload.busTransit > 10 else "critical"
+            },
+            {
+                "agent": "Energy Intelligence Agent",
+                "message": f"Our solar subsidy grid is set to ${payload.solarFunding}M. If solar funding is below $15M, we cannot support the charging grid required for the transit fleet frequency increase of {payload.busTransit}%.",
+                "sentiment": "supportive" if payload.solarFunding >= 15 else "critical"
+            },
+            {
+                "agent": "Public Safety Agent",
+                "message": f"Deploying {payload.emergencyTeams} emergency personnel units provides good response margins, but signal phase adjustments of {payload.signalTimer}s must not interfere with emergency vehicle preemption protocols.",
+                "sentiment": "neutral"
+            },
+            {
+                "agent": "Citizen Engagement Agent",
+                "message": f"While safety indices are good, a congestion toll of £{payload.congestionToll} will likely trigger negative public feedback unless public transit frequency is increased by at least 30% to offset travel costs.",
+                "sentiment": "critical" if payload.congestionToll > 8 and payload.busTransit < 30 else "supportive"
+            }
+        ]
+    }
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            prompt = f"""
+            You are the London Civic Senate Chamber simulation engine.
+            Simulate a short round-robin debate (exactly 4 messages) between 4 specific AI agents regarding the following proposed policy mix:
+            - Bus Transit Frequency Shift: {payload.busTransit}%
+            - Traffic Signal Adjustments: {payload.signalTimer} seconds
+            - Emergency Response Teams: {payload.emergencyTeams} active teams
+            - Solar Grid Infrastructure Funding: ${payload.solarFunding}M
+            - Congestion Toll Rate: £{payload.congestionToll}
+            
+            The debate must feature these four agents arguing from their respective perspectives:
+            1. "Traffic Intelligence Agent": Cares about average speed, delays, and congestion pricing.
+            2. "Energy Intelligence Agent": Cares about clean power, charging stations, and grid strain.
+            3. "Public Safety Agent": Cares about emergency response, preemption signals, and safety.
+            4. "Citizen Engagement Agent": Cares about public approval, travel costs, and fairness.
+            
+            You must output a JSON object containing:
+            1. "topic": A string summarizing the core conflict of this policy mix.
+            2. "debate": A list of exactly 4 objects, each containing:
+               - "agent": The exact name of the agent (one of the four above).
+               - "message": A 2-sentence argument matching their personality and criticizing/supporting the current policy settings.
+               - "sentiment": One of "supportive", "critical", or "neutral".
+               
+            Format your response strictly as a raw JSON object. Do not include any markdown formatting wrappers (like ```json).
+            """
+            response = model.generate_content(prompt)
+            data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+            if "topic" in data and "debate" in data:
+                return data
+        except Exception as e:
+            logger.error(f"Gemini senate debate simulation failed: {e}. Falling back to template.", exc_info=True)
+            
+    return math_debate
 
 if __name__ == "__main__":
     import uvicorn
