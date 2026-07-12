@@ -1,101 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Send, BrainCircuit, Loader2, ChevronDown, ChevronRight, X, ShieldAlert, Award, FileSpreadsheet } from 'lucide-react';
 
-const mockResponses = {
-  "why is traffic increasing near sector 18?": {
-    thoughts: [
-      "Interpreting query 'traffic increasing near Sector 18'",
-      "Running SELECT query on `metro_city_iot.traffic_sensors` for Sector 18...",
-      "Fetched: Speed dropped to 8 mph, sensor load at 88%.",
-      "Correlating traffic anomalies with environmental conditions...",
-      "Detected: Rain sensors show precipitation = 12mm/hr.",
-      "Cross-referencing road construction schedule database...",
-      "Found: Scheduled lane maintenance on I-95 expressway off-ramp near Sector 18.",
-      "Correlating emergency dispatches...",
-      "Found: Minor fender-bender reported on lane 2. Accident clearance in progress.",
-      "Structuring response with recommendations and confidence values."
-    ],
-    content: `Based on real-time telemetry, traffic congestion near **Sector 18** has spiked by **41%** compared to the baseline. This is caused by a confluence of three distinct factors:
 
-1. **Precipitation event**: Heavy rain (12mm/hr) has slowed travel speeds.
-2. **Lane closure**: Roadworks are underway on the Sector 18 exit lane.
-3. **Fender-bender**: A two-vehicle accident is blocking Lane 2 of the slip road.`,
-    confidence: 94,
-    sources: [
-      "BigQuery: `metro_city_iot.traffic_sensors` (updated 2 mins ago)",
-      "BigQuery: `metro_city_env.weather_telemetry` (updated 5 mins ago)",
-      "Supabase: `municipality_ops.construction_schedule`"
-    ],
-    actions: [
-      { name: "Increase green light duration by 25s at Sector 18 junction", impact: "Reduces queue length by 35% within 15 minutes" },
-      { name: "Deploy 2 traffic coordinators to route vehicles via Central Avenue", impact: "Saves an estimated 8 minutes per vehicle" },
-      { name: "Send incident notification to Google Maps & local navigation apps", impact: "Diverts 15% of approaching traffic before entrance" }
-    ],
-    alternatives: [
-      "Open temporary shoulder lane on expressway (Impact: High cost, 10 min setup)",
-      "Initiate congestion pricing warning (Impact: Lower short-term compliance)"
-    ]
-  },
-  "show top pollution areas.": {
-    thoughts: [
-      "Analyzing request for 'top pollution areas'",
-      "Querying `metro_city_env.air_quality` grouped by sector...",
-      "Averages for last 6 hours: Sector 7 (AQI 152), Sector 12 (AQI 115), Sector 4 (AQI 34).",
-      "Analyzing temporal trend: Industrial zone shows consistent particulate emissions.",
-      "Determining main pollutant: PM2.5 and NO2 levels are elevated in industrial pockets.",
-      "Synthesizing report."
-    ],
-    content: `The top air pollution regions in the metropolitan area based on the last 2 hours of sensor records are:
 
-* **Sector 7 (Industrial Park West)**: **AQI 152** (Unhealthy). Primary pollutant: PM2.5.
-* **Sector 12 (Logistics Hub South)**: **AQI 115** (Moderate). Primary pollutant: NO2 (diesel fumes).
-* **Sector 3 (Commercial Downtown)**: **AQI 92** (Moderate). Primary pollutant: Ozone.`,
-    confidence: 88,
-    sources: [
-      "BigQuery: `metro_city_env.air_quality` (last hourly average)",
-      "IoT Sensors: `aqi_monitors_station_west` (real-time stream)"
-    ],
-    actions: [
-      { name: "Activate air mist cannons at Industrial Park West", impact: "Reduces immediate dust settling times by 20%" },
-      { name: "Enforce heavy truck idling limits at Logistics Hub South", impact: "Lowers NO2 concentration by 12% during peak shifts" }
-    ],
-    alternatives: [
-      "Impose partial industrial shutdown (Impact: Disruptive, High political resistance)",
-      "Deploy localized portable air purifiers in public squares (Impact: Medium cost, low localized impact)"
-    ]
-  },
-  "why are complaints increasing?": {
-    thoughts: [
-      "Analyzing complaints trend over last 7 days...",
-      "Querying Supabase: `citizen_complaints` grouped by date and category.",
-      "Data reveals: Category 'Streetlights' up 180%, 'Sanitation' up 45%.",
-      "Cross-referencing streetlights anomalies with power grid alerts...",
-      "Discovered: Sector 4 substation underwent repair on July 4, causing partial grid trips.",
-      "Sanitation complaints correlated with waste collection trucks: Truck #4 out of service for repairs.",
-      "Compiling explanation report."
-    ],
-    content: `Citizen complaints have increased by **26%** this week. Analysis of the categories indicates two distinct local issues:
-
-1. **Streetlight Outages (+180%)**: Concentrated heavily in **Sector 4**. This aligns with a power grid trip at Substation E on July 4, which damaged local street lighting circuits.
-2. **Garbage Overflow (+45%)**: Centered in residential clusters. This was caused by an unscheduled maintenance breakdown of Sanitation Truck #4, causing collection delays.`,
-    confidence: 91,
-    sources: [
-      "Supabase: `citizen_complaints` (active state logs)",
-      "BigQuery: `metro_city_ops.utility_logs` (power substation E logs)",
-      "Supabase: `municipality_sanitation.truck_rosters`"
-    ],
-    actions: [
-      { name: "Dispatch emergency grid team to reset circuit breakers in Sector 4", impact: "Restores 85% of offline streetlights in 3 hours" },
-      { name: "Reroute Sanitation Truck #8 to cover Sector 4's missed route", impact: "Resolves waste accumulation backlogs within 12 hours" }
-    ],
-    alternatives: [
-      "Extend municipal worker shifts (Impact: Overtime budget increased by $12k)",
-      "Request citizens to hold non-hazardous waste temporarily (Impact: Poor citizen feedback)"
-    ]
-  }
-};
-
-export default function AICopilot({ isOpen, onClose, onActionTriggered }) {
+export default function AICopilot({ 
+  isOpen, 
+  onClose, 
+  onActionTriggered, 
+  liveWeather, 
+  liveAqi, 
+  tickets = [], 
+  sustainability, 
+  liveTransport 
+}) {
   const [messages, setMessages] = useState([
     {
       role: 'model',
@@ -106,6 +23,7 @@ export default function AICopilot({ isOpen, onClose, onActionTriggered }) {
       confidence: 100
     }
   ]);
+  const [executedActions, setExecutedActions] = useState({});
   const [input, setInput] = useState('');
   const [activeThoughts, setActiveThoughts] = useState('');
   const [expandedThoughts, setExpandedThoughts] = useState({});
@@ -218,27 +136,88 @@ export default function AICopilot({ isOpen, onClose, onActionTriggered }) {
 
   const simulateLocalResponse = (query) => {
     const normQuery = query.toLowerCase();
-    const mockAns = mockResponses[normQuery] || {
-      thoughts: [
-        "Analyzing user input query...",
-        "Query text does not match standard cached patterns. Accessing general knowledge RAG pipeline...",
-        "Scanning BigQuery datasets for relevant vectors...",
-        "Correlating current city conditions: Temperature: 78°F, Humidity: 62%, Normal congestion.",
-        "Generating synthetic response based on available mock databases."
-      ],
-      content: `I have analyzed your query: *"${query}"*. Currently, municipal systems show normal performance across all primary metrics. Let me know if you would like me to compile a specific report on air quality, transit, or energy demand.`,
-      confidence: 85,
-      sources: ["BigQuery Vector Index: `metro_city_kb.vector_store`"],
-      actions: [
-        { name: "Trigger global telemetry diagnostic", impact: "Ensures accuracy of current sensors" }
-      ],
-      alternatives: []
-    };
+    let thoughts = ["Analyzing user query: " + query];
+    let content = "";
+    let confidence = 95;
+    let sources = ["Local SQLite database", "Live Sensor network API"];
+    let actions = [];
+
+    if (normQuery.includes("traffic") || normQuery.includes("speed") || normQuery.includes("congestion")) {
+      thoughts.push("Scanning Piccadilly and London Bridge sensors...");
+      thoughts.push("Found active traffic nodes. Tower Bridge speed sensor shows congested status.");
+      
+      const delayCount = liveTransport ? liveTransport.filter(line => {
+        const desc = line.lineStatuses?.[0]?.statusSeverityDescription;
+        return desc && desc !== 'Good Service' && desc !== 'Special Service';
+      }).length : 0;
+      
+      content = `**Traffic Congestion & Transit Analysis**:
+* Piccadilly Circus and London Bridge North CCTV nodes are reporting normal active traffic flows.
+* Tower Bridge speed sensor reports **Congested** with speeds averaging 8 mph (84% congestion).
+* TfL Tube network currently reports **${delayCount} lines** experiencing delays or service adjustments.`;
+      
+      actions = [
+        { name: "Adjust Piccadilly roundabout signal offsets by 25s", impact: "Reduces backlog queue lengths by 22%" },
+        { name: "Enforce smart toll pricing dynamic offset levels", impact: "Depresses central commuter volume by 12%" }
+      ];
+    } 
+    else if (normQuery.includes("pollution") || normQuery.includes("aqi") || normQuery.includes("air") || normQuery.includes("weather") || normQuery.includes("temp") || normQuery.includes("rain")) {
+      thoughts.push("Accessing live meteorological API...");
+      const temp = liveWeather?.current?.temperature_2m || 16.5;
+      const rain = liveWeather?.current?.precipitation || 0.0;
+      const pm25 = liveAqi?.current?.pm2_5 || 12;
+      
+      content = `**Environmental & Meteorological Summary**:
+* **Temperature**: ${temp}°C (Apparent: ${liveWeather?.current?.apparent_temperature || temp}°C).
+* **Precipitation**: ${rain} mm.
+* **Air Quality (PM2.5)**: ${pm25} µg/m³ (Status: ${pm25 > 15 ? 'Moderate' : 'Good'}).
+* **Solar Output**: ${sustainability?.solar_output_mw || 15.2} MW current microgrid output.`;
+      
+      actions = [
+        { name: "Activate London District green zone air mist sprays", impact: "Clears particulate matter PM2.5 levels by 15%" }
+      ];
+    }
+    else if (normQuery.includes("complaint") || normQuery.includes("ticket") || normQuery.includes("incident")) {
+      thoughts.push("Scanning SQLite complaints database...");
+      const active = tickets.filter(t => t.status !== "Resolved");
+      const critical = active.filter(t => t.priority === "Critical").length;
+      
+      content = `**Citizen Complaints & Safety Incidents**:
+* Detected **${active.length} active tickets** in the queue.
+* There are **${critical} critical priority issues** requiring dispatcher coordination.
+* Categories consist of: ${[...new Set(active.map(t => t.category))].join(", ") || "None"}.`;
+      
+      actions = [
+        { name: "Deploy emergency response crew to active critical incidents", impact: "Resolves urgent utility/roads hazards within 90 minutes" }
+      ];
+    }
+    else if (normQuery.includes("budget") || normQuery.includes("spent") || normQuery.includes("money") || normQuery.includes("cost")) {
+      thoughts.push("Querying municipal treasury ledgers...");
+      content = `**Municipal Financial & Carbon Budget Report**:
+* **Carbon Offset Savings**: ${sustainability?.carbon_saved_tonnes_hr || 3.8} Tonnes/hr saved.
+* **Total YTD Spent**: £${(sustainability?.renewable_grid_mix_pct || 65) * 1.2}M across sectors.
+* All departmental finances are balanced and compliant with statutory targets.`;
+      
+      actions = [
+        { name: "Trigger municipal budget synchronization audit", impact: "Guarantees YTD ledger compliance across all districts" }
+      ];
+    }
+    else {
+      thoughts.push("Accessing general knowledge index...");
+      thoughts.push("Correlating overall performance score: 86%");
+      content = `Hello! I am the CivicMind AI Decision Copilot. 
+Here is a quick overview of the city:
+* **Mobility**: Tube network operating normally; local bike docking stations are active.
+* **Environment**: Temperature is ${liveWeather?.current?.temperature_2m || 16}°C; PM2.5 particulate count is good.
+* **Active Issues**: ${tickets.filter(t => t.status !== "Resolved").length} open complaints are being tracked.
+
+Ask me about: **traffic, air quality, citizen complaints, or budgets** to run smart analytics!`;
+    }
 
     let currentThoughtIndex = 0;
     const thoughtsInterval = setInterval(() => {
-      if (currentThoughtIndex < mockAns.thoughts.length) {
-        setActiveThoughts(prev => prev + (prev ? '\n' : '') + mockAns.thoughts[currentThoughtIndex]);
+      if (currentThoughtIndex < thoughts.length) {
+        setActiveThoughts(prev => prev + (prev ? '\n' : '') + thoughts[currentThoughtIndex]);
         currentThoughtIndex++;
       } else {
         clearInterval(thoughtsInterval);
@@ -249,26 +228,33 @@ export default function AICopilot({ isOpen, onClose, onActionTriggered }) {
             ...prev,
             {
               role: 'model',
-              content: mockAns.content,
-              thoughts: mockAns.thoughts.join('\n'),
-              confidence: mockAns.confidence,
-              sources: mockAns.sources,
-              actions: msgActions(mockAns.actions),
-              alternatives: mockAns.alternatives || [],
+              content: content,
+              thoughts: thoughts.join('\n'),
+              confidence: confidence,
+              sources: sources,
+              actions: actions,
+              alternatives: [],
               suggestions: []
             }
           ]);
           setActiveThoughts('');
-        }, 800);
+        }, 100);
       }
-    }, 500);
+    }, 20);
   };
 
-  const msgActions = (actions) => {
-    return actions ? actions.map(act => ({ name: act.name, impact: act.impact })) : [];
-  };
+
 
   const handleActionClick = (actionName) => {
+    setExecutedActions(prev => ({ ...prev, [actionName]: true }));
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'model',
+        content: `🤖 **Dispatch Success**: Action *"${actionName}"* has been successfully authorized and logged. Incident coordinators have been dispatched.`,
+        isSystemSuccess: true
+      }
+    ]);
     if (onActionTriggered) {
       onActionTriggered(actionName);
     }
@@ -292,7 +278,13 @@ export default function AICopilot({ isOpen, onClose, onActionTriggered }) {
       <div className="chat-messages">
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex flex-col gap-2 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-            <div className={`chat-bubble ${msg.role === 'user' ? 'user' : 'model'}`}>
+            <div className={`chat-bubble ${
+              msg.isSystemSuccess 
+                ? 'bg-emerald-50 border border-emerald-250 dark:bg-emerald-950/20 dark:border-emerald-900/40 text-emerald-850 dark:text-emerald-400 text-xs font-semibold p-3.5 rounded-xl w-full'
+                : msg.role === 'user' 
+                ? 'user' 
+                : 'model'
+            }`}>
               {msg.content}
             </div>
 
@@ -362,10 +354,15 @@ export default function AICopilot({ isOpen, onClose, onActionTriggered }) {
                           <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-snug">{act.name}</span>
                           <button
                             onClick={() => handleActionClick(act.name)}
-                            className="btn-3d btn-primary text-[10px]"
-                            style={{ padding: '0.25rem 0.5rem', transform: 'translateY(-2px)', boxShadow: '0 2px 0 var(--accent-dark)' }}
+                            disabled={executedActions[act.name]}
+                            className={`text-[10px] font-extrabold px-2.5 py-1 rounded transition-all ${
+                              executedActions[act.name]
+                                ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-900/30'
+                                : 'btn-3d btn-primary'
+                            }`}
+                            style={executedActions[act.name] ? {} : { padding: '0.25rem 0.5rem', transform: 'translateY(-2px)', boxShadow: '0 2px 0 var(--accent-dark)' }}
                           >
-                            Execute
+                            {executedActions[act.name] ? '✓ Executed' : 'Execute'}
                           </button>
                         </div>
                         <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Impact: {act.impact}</span>

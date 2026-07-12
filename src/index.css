@@ -997,3 +997,39 @@ html.dark .circle-progress-text {
   margin-top: 0.2rem;
 }
 
+/* Floating Draggable Chatbot Button Styles */
+.floating-chatbot-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 15px rgba(249, 115, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.floating-chatbot-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.6);
+}
+
+.floating-chatbot-btn:active {
+  transform: scale(0.95);
+}
+
+html.dark .floating-chatbot-btn {
+  border-color: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+html.dark .floating-chatbot-btn:hover {
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.85);
+}
+

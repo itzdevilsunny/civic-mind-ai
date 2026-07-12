@@ -73,7 +73,53 @@ export default function App() {
   const [activeIncident, setActiveIncident] = useState(null);
   const [isBackendOnline, setIsBackendOnline] = useState(false);
   
-  // API states
+  const [copilotBtnPos, setCopilotBtnPos] = useState({ x: 800, y: 500 });
+  const posRef = useRef({ x: 800, y: 500 });
+  posRef.current = copilotBtnPos;
+  
+  const dragRef = useRef({ isDragging: false, startX: 0, startY: 0, initialX: 800, initialY: 500 });
+
+  useEffect(() => {
+    const xVal = window.innerWidth - 80;
+    const yVal = window.innerHeight - 150;
+    setCopilotBtnPos({ x: xVal, y: yVal });
+    posRef.current = { x: xVal, y: yVal };
+  }, []);
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return;
+    dragRef.current = {
+      isDragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: posRef.current.x,
+      initialY: posRef.current.y
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    e.preventDefault();
+  };
+
+  const handleMouseMove = (e) => {
+    if (!dragRef.current.isDragging) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    const newX = Math.max(10, Math.min(window.innerWidth - 60, dragRef.current.initialX + dx));
+    const newY = Math.max(10, Math.min(window.innerHeight - 60, dragRef.current.initialY + dy));
+    setCopilotBtnPos({ x: newX, y: newY });
+  };
+
+  const handleMouseUp = (e) => {
+    if (!dragRef.current.isDragging) return;
+    dragRef.current.isDragging = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+    const dx = Math.abs(e.clientX - dragRef.current.startX);
+    const dy = Math.abs(e.clientY - dragRef.current.startY);
+    if (dx < 5 && dy < 5) {
+      setIsCopilotOpen(prev => !prev);
+    }
+  };
   const [liveWeather, setLiveWeather] = useState(null);
   const [liveAqi, setLiveAqi] = useState(null);
   const [liveTransport, setLiveTransport] = useState([]);
@@ -1642,11 +1688,32 @@ export default function App() {
         </footer>
       </main>
 
+      {/* Draggable floating round chatbot button */}
+      <button
+        style={{
+          position: 'fixed',
+          left: `${copilotBtnPos.x}px`,
+          top: `${copilotBtnPos.y}px`,
+          zIndex: 10000,
+          cursor: dragRef.current.isDragging ? 'grabbing' : 'grab',
+        }}
+        onMouseDown={handleMouseDown}
+        className="floating-chatbot-btn"
+        title="Drag to reposition / Click to ask AI Copilot"
+      >
+        <Bot className="w-5 h-5 animate-pulse" />
+      </button>
+
       {/* Copilot overlay */}
       <AICopilot 
         isOpen={isCopilotOpen} 
         onClose={() => setIsCopilotOpen(false)}
         onActionTriggered={executeCopilotAction}
+        liveWeather={liveWeather}
+        liveAqi={liveAqi}
+        tickets={tickets}
+        sustainability={sustainability}
+        liveTransport={liveTransport}
       />
     </div>
   );
