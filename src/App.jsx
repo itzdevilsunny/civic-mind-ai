@@ -19,7 +19,11 @@ import {
   Lightbulb,
   Bell,
   Network,
-  Wrench
+  Wrench,
+  LogIn,
+  LogOut,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -88,6 +92,20 @@ export default function App() {
   const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('civicmind_city') || 'mumbai');
   const [selectedLang, setSelectedLang] = useState(() => localStorage.getItem('civicmind_lang') || 'en');
   const cityInfo = getCityByValue(selectedCity);
+
+  // Sign in/out state
+  const [isSignedIn, setIsSignedIn] = useState(() => localStorage.getItem('civicmind_signed_in') === 'true');
+  const handleSignToggle = () => {
+    const next = !isSignedIn;
+    setIsSignedIn(next);
+    localStorage.setItem('civicmind_signed_in', String(next));
+  };
+
+  // Tab order for Back/Next navigation
+  const TAB_ORDER = ['overview','transportations','traffic','weather','news','others','pulse','budget','proposals','maintenance','agentlog'];
+  const currentTabIdx = TAB_ORDER.indexOf(activeTab);
+  const goBack = () => { if (currentTabIdx > 0) setActiveTab(TAB_ORDER[currentTabIdx - 1]); };
+  const goNext = () => { if (currentTabIdx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[currentTabIdx + 1]); };
 
   const [copilotBtnPos, setCopilotBtnPos] = useState({ x: 800, y: 500 });
   const posRef = useRef({ x: 800, y: 500 });
@@ -747,6 +765,28 @@ export default function App() {
 
         {/* Action button triggers */}
         <div className="mt-auto flex flex-col gap-3 pt-4 border-t border-slate-150/10">
+          {/* Sign In / Sign Out button */}
+          <button
+            onClick={handleSignToggle}
+            className="btn-3d flex items-center justify-center gap-2 w-full transition-all duration-300"
+            style={{
+              fontSize: '11px', fontWeight: '700', padding: '8px 12px',
+              borderRadius: '8px', cursor: 'pointer',
+              background: isSignedIn
+                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                : 'linear-gradient(135deg, #10b981, #059669)',
+              color: 'white',
+              border: isSignedIn ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(16,185,129,0.4)',
+              boxShadow: isSignedIn
+                ? '0 2px 10px rgba(239,68,68,0.3)'
+                : '0 2px 10px rgba(16,185,129,0.3)',
+            }}
+            title={isSignedIn ? 'Sign Out' : 'Sign In'}
+          >
+            {isSignedIn ? <LogOut className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
+            <span>{isSignedIn ? 'Sign Out' : 'Sign In'}</span>
+          </button>
+
           <button 
             onClick={() => setIsCopilotOpen(true)}
             className="btn-3d btn-primary flex items-center justify-center gap-2 w-full"
@@ -858,6 +898,43 @@ export default function App() {
               <div className="flex items-center gap-1.5">
                 <span className={`dot-indicator ${isBackendOnline ? 'dot-success animate-pulse' : 'dot-warning'}`}></span>
                 <span className="text-[10px] font-bold text-slate-450 uppercase">{isBackendOnline ? 'API Sync Live' : 'Fallback Sandbox'}</span>
+              </div>
+              {/* Back / Next nav buttons */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={goBack}
+                  disabled={currentTabIdx <= 0}
+                  title="Previous tab"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '26px', height: '26px', borderRadius: '6px',
+                    border: '1px solid rgba(99,102,241,0.3)',
+                    background: currentTabIdx <= 0 ? 'rgba(148,163,184,0.1)' : 'rgba(99,102,241,0.12)',
+                    color: currentTabIdx <= 0 ? '#94a3b8' : '#6366f1',
+                    cursor: currentTabIdx <= 0 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                  }}
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={goNext}
+                  disabled={currentTabIdx >= TAB_ORDER.length - 1}
+                  title="Next tab"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '26px', height: '26px', borderRadius: '6px',
+                    border: '1px solid rgba(99,102,241,0.3)',
+                    background: currentTabIdx >= TAB_ORDER.length - 1 ? 'rgba(148,163,184,0.1)' : 'rgba(99,102,241,0.12)',
+                    color: currentTabIdx >= TAB_ORDER.length - 1 ? '#94a3b8' : '#6366f1',
+                    cursor: currentTabIdx >= TAB_ORDER.length - 1 ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    flexShrink: 0,
+                  }}
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </div>
