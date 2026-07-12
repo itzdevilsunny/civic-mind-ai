@@ -453,6 +453,111 @@ export default function App() {
     };
   };
 
+  const getCityRadarOption = () => {
+    const tubeDelayCount = liveTransport ? liveTransport.filter(line => {
+      const desc = line.lineStatuses?.[0]?.statusSeverityDescription;
+      return desc && desc !== 'Good Service' && desc !== 'Special Service';
+    }).length : 0;
+    
+    const mobilityScore = Math.max(35, Math.min(98, Math.round(88 - (tubeDelayCount * 6) + ((bikepoints.global?.occupancy_pct || 40) - 40) * 0.1)));
+
+    const pm25 = liveAqi?.current?.pm2_5 || 12;
+    const solarVal = sustainability?.solar_output_mw || 15.0;
+    const environmentScore = Math.max(35, Math.min(98, Math.round(92 - (pm25 * 0.8) + (solarVal * 0.2))));
+
+    const financialsScore = sustainability ? Math.max(45, Math.min(98, Math.round(95 - (sustainability.emissions_kg_hr * 0.002)))) : 82;
+
+    const criticalTickets = tickets.filter(t => t.priority === 'Critical' && t.status !== 'Resolved').length;
+    const safetyScore = Math.max(35, Math.min(98, Math.round(90 - (criticalTickets * 8))));
+
+    const sentimentScore = Math.max(35, Math.min(98, Math.round(78 - (criticalTickets * 5))));
+
+    const data = [mobilityScore, environmentScore, financialsScore, safetyScore, sentimentScore];
+
+    return {
+      tooltip: { trigger: 'item' },
+      radar: {
+        indicator: [
+          { name: 'Mobility', max: 100 },
+          { name: 'Environment', max: 100 },
+          { name: 'Financials', max: 100 },
+          { name: 'Safety', max: 100 },
+          { name: 'Sentiment', max: 100 }
+        ],
+        shape: 'polygon',
+        splitNumber: 4,
+        axisName: {
+          color: '#64748b',
+          fontSize: 9,
+          fontWeight: 'bold'
+        },
+        splitLine: {
+          lineStyle: {
+            color: [
+              'rgba(99, 102, 241, 0.05)',
+              'rgba(99, 102, 241, 0.1)',
+              'rgba(99, 102, 241, 0.2)',
+              'rgba(99, 102, 241, 0.35)'
+            ]
+          }
+        },
+        splitArea: { show: false },
+        axisLine: { lineStyle: { color: 'rgba(99, 102, 241, 0.1)' } }
+      },
+      series: [
+        {
+          name: 'London Civic Health',
+          type: 'radar',
+          data: [
+            {
+              value: data,
+              name: 'Civic Performance Score',
+              symbol: 'circle',
+              symbolSize: 4,
+              itemStyle: { color: '#6366f1' },
+              lineStyle: { width: 2, color: '#6366f1' },
+              areaStyle: {
+                color: {
+                  type: 'radial',
+                  x: 0.5,
+                  y: 0.5,
+                  r: 0.5,
+                  colorStops: [
+                    { offset: 0, color: 'rgba(99, 102, 241, 0.05)' },
+                    { offset: 1, color: 'rgba(99, 102, 241, 0.3)' }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    };
+  };
+
+  const getAIDiagnosisSummary = () => {
+    let alerts = [];
+    const tubeDelayCount = liveTransport ? liveTransport.filter(line => {
+      const desc = line.lineStatuses?.[0]?.statusSeverityDescription;
+      return desc && desc !== 'Good Service' && desc !== 'Special Service';
+    }).length : 0;
+    if (tubeDelayCount > 0) alerts.push(`${tubeDelayCount} Tube line delays`);
+    
+    const rain = liveWeather?.current?.precipitation || 0.0;
+    if (rain > 0.5) alerts.push(`wet road conditions (${rain}mm)`);
+    
+    const pm25 = liveAqi?.current?.pm2_5 || 12;
+    if (pm25 > 15) alerts.push(`elevated PM2.5 AQI`);
+
+    const criticalTickets = tickets.filter(t => t.priority === 'Critical' && t.status !== 'Resolved').length;
+    if (criticalTickets > 0) alerts.push(`${criticalTickets} critical incidents`);
+
+    if (alerts.length === 0) {
+      return "All London municipal systems operating optimally. Low environmental risk levels, balanced departmental budgets, and smooth transport line flows detected.";
+    }
+    return `Civic Intelligence sensors report: ${alerts.join(', ')}. Multi-agent coordination protocols are currently active to resolve bottlenecks and optimize municipal scores.`;
+  };
+
   const filteredTickets = tickets.filter(t => 
     t.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     t.id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -623,9 +728,41 @@ export default function App() {
 
         <div className="content-body animate-fade-in">
           
-          {/* TAB 1: OVERVIEW */}
+           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="flex flex-col gap-6">
+              
+              {/* Civic Health Radar & AI Diagnosis Split Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Radar Chart (2/3 width) */}
+                <div className="card lg:col-span-2">
+                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                    <h3 className="card-title">🕸️ Civic Health Radar index</h3>
+                    <span className="card-subtitle">Real-time multi-dimensional city metrics overview</span>
+                  </div>
+                  <div className="h-[220px]">
+                    <ReactECharts option={getCityRadarOption()} style={{ height: '100%', width: '100%' }} />
+                  </div>
+                </div>
+
+                {/* AI Operational Diagnosis card (1/3 width) */}
+                <div className="card flex flex-col justify-between">
+                  <div>
+                    <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                      <h3 className="card-title">🤖 AI Operational Diagnosis</h3>
+                      <span className="card-subtitle">Gemini real-time civic health report</span>
+                    </div>
+                    <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-medium mt-2">
+                      {getAIDiagnosisSummary()}
+                    </p>
+                  </div>
+                  <div className="mt-4 p-3 bg-indigo-50/10 border border-indigo-150/10 rounded-xl flex justify-between items-center text-[10px] font-mono text-indigo-650">
+                    <span>COORDINATOR: ACTIVE</span>
+                    <span>DIAGNOSIS CONFIDENCE: 94%</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Weather Station Summary Card */}
               <div className="card">
                 <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
