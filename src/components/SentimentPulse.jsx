@@ -81,7 +81,7 @@ function PulseGauge({ score }) {
   );
 }
 
-export default function SentimentPulse({ isDarkMode }) {
+export default function SentimentPulse({ isDarkMode, cityInfo }) {
   const [pulse, setPulse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -89,7 +89,10 @@ export default function SentimentPulse({ isDarkMode }) {
 
   const fetchPulse = () => {
     setLoading(true);
-    fetch('/api/sentiment/pulse')
+    const params = cityInfo
+      ? `?city=${encodeURIComponent(cityInfo.label)}&lat=${cityInfo.lat}&lng=${cityInfo.lng}`
+      : '';
+    fetch(`/api/sentiment/pulse${params}`)
       .then(r => r.json())
       .then(data => { setPulse(data); setLastUpdated(new Date().toLocaleTimeString()); })
       .catch(err => console.error('Pulse fetch error:', err))
@@ -100,7 +103,7 @@ export default function SentimentPulse({ isDarkMode }) {
     fetchPulse();
     const t = setInterval(fetchPulse, 60000);
     return () => clearInterval(t);
-  }, []);
+  }, [cityInfo]);
 
   const radarOption = pulse ? {
     backgroundColor: 'transparent',

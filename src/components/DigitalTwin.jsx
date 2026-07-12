@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Layers, Camera, AlertTriangle, Wind, Zap, Activity, Info, ShieldAlert, Bike } from 'lucide-react';
 
-const initialNodes = [
-  { id: 'weather-1', type: 'aqi', name: 'Westminster Air Quality Hub', lat: 51.4988, lon: -0.1309, status: 'Good', metric: 'PM2.5: 8 µg/m³ | PM10: 12 µg/m³', color: '#10b981' },
-  { id: 'cam-1', type: 'camera', name: 'Traffic CCTV - Piccadilly Circus', lat: 51.5101, lon: -0.1349, status: 'Active', metric: 'Live camera feed running', color: '#6366f1' },
-  { id: 'cam-2', type: 'camera', name: 'Traffic CCTV - London Bridge North', lat: 51.5079, lon: -0.0877, status: 'Active', metric: 'Live camera feed running', color: '#6366f1' },
-  { id: 'traffic-1', type: 'traffic', name: 'Tower Bridge Speed Sensor', lat: 51.5055, lon: -0.0754, status: 'Congested', metric: 'Speed: 8 mph | Congestion: 84%', color: '#ef4444' },
-  { id: 'traffic-2', type: 'traffic', name: 'Hyde Park Underpass Sensor', lat: 51.5028, lon: -0.1508, status: 'Flowing', metric: 'Speed: 38 mph | Congestion: 15%', color: '#10b981' },
-  { id: 'power-1', type: 'power', name: 'National Grid Substation - Bank', lat: 51.5132, lon: -0.0886, status: 'Normal', metric: 'Grid load: 64% | Operating normally', color: '#10b981' },
-  { id: 'power-2', type: 'power', name: 'Solar Microgrid - London South Bank', lat: 51.5065, lon: -0.1115, status: 'Normal', metric: 'Generation: 1.2 MW', color: '#10b981' },
-  { id: 'incident-1', type: 'incident', name: 'Water Main Burst - Waterloo Road', lat: 51.5033, lon: -0.1123, status: 'Critical', metric: 'Water depth: 15cm | Response team dispatched', color: '#ef4444' }
-];
+const getOffsetNodes = (city) => {
+  const centerLat = city?.lat || 19.0760;
+  const centerLon = city?.lng || 72.8777;
+  const ldnLat = 51.5074;
+  const ldnLon = -0.1278;
+
+  return [
+    { id: 'weather-1', type: 'aqi', name: `${city?.districts?.[0] || 'Zone A'} Air Quality Hub`, lat: centerLat + (51.4988 - ldnLat), lon: centerLon + (-0.1309 - ldnLon), status: 'Good', metric: 'PM2.5: 18 µg/m³ | PM10: 32 µg/m³', color: '#10b981' },
+    { id: 'cam-1', type: 'camera', name: `Traffic CCTV - ${city?.districts?.[1] || 'Zone B'} Junction`, lat: centerLat + (51.5101 - ldnLat), lon: centerLon + (-0.1349 - ldnLon), status: 'Active', metric: 'Live camera feed running', color: '#6366f1' },
+    { id: 'cam-2', type: 'camera', name: `Traffic CCTV - ${city?.districts?.[2] || 'Zone C'} Crossing`, lat: centerLat + (51.5079 - ldnLat), lon: centerLon + (-0.0877 - ldnLon), status: 'Active', metric: 'Live camera feed running', color: '#6366f1' },
+    { id: 'traffic-1', type: 'traffic', name: `${city?.districts?.[3] || 'Zone D'} Speed Sensor`, lat: centerLat + (51.5055 - ldnLat), lon: centerLon + (-0.0754 - ldnLon), status: 'Congested', metric: 'Speed: 12 km/h | Congestion: 78%', color: '#ef4444' },
+    { id: 'traffic-2', type: 'traffic', name: `${city?.districts?.[4] || 'Zone E'} Highway Sensor`, lat: centerLat + (51.5028 - ldnLat), lon: centerLon + (-0.1508 - ldnLon), status: 'Flowing', metric: 'Speed: 65 km/h | Congestion: 12%', color: '#10b981' },
+    { id: 'power-1', type: 'power', name: `Substation - ${city?.districts?.[5] || 'Zone F'}`, lat: centerLat + (51.5132 - ldnLat), lon: centerLon + (-0.0886 - ldnLon), status: 'Normal', metric: 'Grid load: 58% | Operating normally', color: '#10b981' },
+    { id: 'power-2', type: 'power', name: `Solar Microgrid - ${city?.districts?.[6] || 'Zone G'}`, lat: centerLat + (51.5065 - ldnLat), lon: centerLon + (-0.1115 - ldnLon), status: 'Normal', metric: 'Generation: 1.8 MW', color: '#10b981' },
+    { id: 'incident-1', type: 'incident', name: `Water Leakage - ${city?.districts?.[7] || 'Zone H'} Road`, lat: centerLat + (51.5033 - ldnLat), lon: centerLon + (-0.1123 - ldnLon), status: 'Critical', metric: 'Water depth: 10cm | Maintenance dispatch ready', color: '#ef4444' }
+  ];
+};
 
 function CctvFeed({ node }) {
   const canvasRef = useRef(null);
@@ -196,8 +203,8 @@ function CctvFeed({ node }) {
   );
 }
 
-export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch, bikepointsList = [] }) {
-  const [nodes, setNodes] = useState(nodesList.length > 0 ? nodesList : initialNodes);
+export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch, bikepointsList = [], cityInfo }) {
+  const [nodes, setNodes] = useState([]);
   const [emergencyServices, setEmergencyServices] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   
@@ -218,15 +225,27 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
   const mapInstanceRef = useRef(null);
   const markersRef = useRef({});
 
-  // Fetch heatmap complaint data
+  // Sync nodes list or offset nodes when cityInfo changes
   useEffect(() => {
-    fetch('/api/heatmap/complaints')
+    if (nodesList && nodesList.length > 0) {
+      setNodes(nodesList);
+    } else if (cityInfo) {
+      setNodes(getOffsetNodes(cityInfo));
+    }
+  }, [nodesList, cityInfo]);
+
+  // Fetch heatmap complaint data (city-aware)
+  useEffect(() => {
+    const params = cityInfo
+      ? `?city=${encodeURIComponent(cityInfo.label)}&lat=${cityInfo.lat}&lng=${cityInfo.lng}`
+      : '';
+    fetch(`/api/heatmap/complaints${params}`)
       .then(res => res.json())
       .then(data => {
         if (data.districts) setHeatmapData(data.districts);
       })
       .catch(err => console.error('Heatmap fetch error:', err));
-  }, []);
+  }, [cityInfo]);
 
   // Fetch emergency services on mount
   useEffect(() => {
@@ -240,21 +259,15 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       .catch(err => console.error("Failed to load emergency services:", err));
   }, []);
 
-  useEffect(() => {
-    if (nodesList && nodesList.length > 0) {
-      setNodes(nodesList);
-    }
-  }, [nodesList]);
-
   // Dynamic incident support
   useEffect(() => {
-    if (activeIncident) {
+    if (activeIncident && cityInfo) {
       const newNode = {
         id: `incident-dyn-${Date.now()}`,
         type: 'incident',
         name: activeIncident.title || 'Reported Incident',
-        lat: activeIncident.lat || 51.5074 + (Math.random() * 0.02 - 0.01),
-        lon: activeIncident.lon || -0.1278 + (Math.random() * 0.02 - 0.01),
+        lat: activeIncident.lat || cityInfo.lat + (Math.random() * 0.02 - 0.01),
+        lon: activeIncident.lon || cityInfo.lng + (Math.random() * 0.02 - 0.01),
         status: 'Active',
         metric: `Description: ${activeIncident.description || 'Reported via Copilot'}`,
         color: '#ef4444'
@@ -266,13 +279,20 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
         mapInstanceRef.current.setView([newNode.lat, newNode.lon], 14);
       }
     }
-  }, [activeIncident]);
+  }, [activeIncident, cityInfo]);
+
+  // Pan map when selected city updates
+  useEffect(() => {
+    if (mapInstanceRef.current && cityInfo) {
+      mapInstanceRef.current.setView([cityInfo.lat, cityInfo.lng], 13);
+    }
+  }, [cityInfo]);
 
   useEffect(() => {
-    if (!mapContainerRef.current || !window.L) return;
+    if (!mapContainerRef.current || !window.L || !cityInfo) return;
 
-    // Create the map centered on London
-    const map = window.L.map(mapContainerRef.current).setView([51.505, -0.11], 13);
+    // Create the map centered on the selected Indian city
+    const map = window.L.map(mapContainerRef.current).setView([cityInfo.lat, cityInfo.lng], 13);
     mapInstanceRef.current = map;
 
     // Add high quality tile layer
@@ -552,7 +572,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
           <h3 className="card-title">
             <Layers className="w-5 h-5 text-indigo-600" /> Digital Twin Live Map
           </h3>
-          <span className="card-subtitle">Real-time OpenStreetMap overlay of London municipal IoT network</span>
+          <span className="card-subtitle">Real-time OpenStreetMap overlay of {cityInfo?.label || 'City'} municipal IoT network</span>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.keys(activeLayers).map(layer => (

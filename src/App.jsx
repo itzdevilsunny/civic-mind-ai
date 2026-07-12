@@ -598,7 +598,7 @@ export default function App() {
       },
       series: [
         {
-          name: 'London Civic Health',
+          name: `${cityInfo?.label || 'City'} Civic Health`,
           type: 'radar',
           data: [
             {
@@ -645,7 +645,7 @@ export default function App() {
     if (criticalTickets > 0) alerts.push(`${criticalTickets} critical incidents`);
 
     if (alerts.length === 0) {
-      return "All London municipal systems operating optimally. Low environmental risk levels, balanced departmental budgets, and smooth transport line flows detected.";
+      return `All ${cityInfo?.label || 'City'} municipal systems operating optimally. Low environmental risk levels, balanced departmental budgets, and smooth transport line flows detected.`;
     }
     return `Civic Intelligence sensors report: ${alerts.join(', ')}. Multi-agent coordination protocols are currently active to resolve bottlenecks and optimize municipal scores.`;
   };
@@ -903,7 +903,7 @@ export default function App() {
               {/* Weather Station Summary Card */}
               <div className="card">
                 <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                  <h3 className="card-title"><CloudSun className="w-5 h-5 text-sky-500" /> Weather Station (London Central)</h3>
+                  <h3 className="card-title"><CloudSun className="w-5 h-5 text-sky-500" /> Weather Station ({cityInfo?.label || 'City'} Central)</h3>
                   <span className="card-subtitle">Live meteorological readings from the Open-Meteo network</span>
                 </div>
                 {liveWeather ? (
@@ -957,8 +957,8 @@ export default function App() {
                 {/* Transit line status list card */}
                 <div className="card flex flex-col justify-between">
                   <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title"><Car className="w-5 h-5 text-indigo-600" /> Tube Transit Network</h3>
-                    <span className="card-subtitle">Real-time status updates from Transport for London (TfL)</span>
+                    <h3 className="card-title"><Car className="w-5 h-5 text-indigo-600" /> {cityInfo?.label || 'City'} Transit Network</h3>
+                    <span className="card-subtitle">Real-time status updates from {cityInfo?.label || 'City'} Transit Authority</span>
                   </div>
                   
                   {liveTransport && liveTransport.length > 0 ? (
@@ -1034,7 +1034,7 @@ export default function App() {
                 <div className="card">
                   <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
                     <h3 className="card-title"><FileText className="w-5 h-5 text-blue-600" /> News Feed</h3>
-                    <span className="card-subtitle">Live BBC London Local News</span>
+                    <span className="card-subtitle">Live {cityInfo?.label || 'City'} Local News</span>
                   </div>
                   <div className="flex flex-col gap-3 max-h-[200px] overflow-y-auto pr-1">
                     {liveNews && liveNews.slice(0, 3).map((art, idx) => (
@@ -1060,7 +1060,7 @@ export default function App() {
                   <div className="text-3xl font-bold font-mono text-indigo-700 dark:text-indigo-400 mt-2">
                     {activeBuses.toLocaleString()}
                   </div>
-                  <div className="text-[10px] text-slate-450 mt-4">London Bus Network (Live Traffic Adjusted)</div>
+                  <div className="text-[10px] text-slate-450 mt-4">{cityInfo?.label || 'City'} Bus Network (Live Traffic Adjusted)</div>
                 </div>
                 <div className="card bg-sky-50/50 dark:bg-sky-950/20 border-sky-150">
                   <div className="card-header pb-2">
@@ -1171,6 +1171,7 @@ export default function App() {
                   activeTickets={tickets}
                   bikepointsList={bikepoints.stations || []}
                   onEmergencyDispatch={loadLiveData}
+                  cityInfo={cityInfo}
                   onSelectNode={(node) => {
                     if (node.action === 'dispatch') {
                       setSystemLogs(prev => [`Safety Agent: [Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
@@ -1200,16 +1201,16 @@ export default function App() {
                     </div>
                   </div>
                   <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=400&q=80" alt="London Bridge Traffic" className="w-full h-40 object-cover" />
+                    <img src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=400&q=80" alt="City Bridge Traffic" className="w-full h-40 object-cover" />
                     <div className="p-3 bg-slate-50 dark:bg-slate-900">
-                      <div className="font-bold text-xs">CCTV_02: London Bridge North</div>
+                      <div className="font-bold text-xs">CCTV_02: {cityInfo?.districts?.[2] || 'Main'} Crossing</div>
                       <div className="text-[10px] text-emerald-500 font-bold mt-1">STATUS: NORMAL FLOW</div>
                     </div>
                   </div>
                   <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80" alt="Tower Bridge Traffic" className="w-full h-40 object-cover" />
+                    <img src="https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80" alt="City Traffic" className="w-full h-40 object-cover" />
                     <div className="p-3 bg-slate-50 dark:bg-slate-900">
-                      <div className="font-bold text-xs">CCTV_03: Tower Bridge Approach</div>
+                      <div className="font-bold text-xs">CCTV_03: {cityInfo?.districts?.[3] || 'Secondary'} Flyover</div>
                       <div className="text-[10px] text-rose-500 font-bold mt-1 animate-pulse">STATUS: CONGESTED (84%)</div>
                     </div>
                   </div>
@@ -1226,7 +1227,7 @@ export default function App() {
               <div className="card">
                 <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
                   <h3 className="card-title">Live Weather &amp; Meteorological Forecast</h3>
-                  <span className="card-subtitle">Real-time reports for London Central</span>
+                  <span className="card-subtitle">Real-time reports for {cityInfo?.label || 'City'} Central</span>
                 </div>
                 {liveWeather ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1309,7 +1310,7 @@ export default function App() {
                     {/* District Sustainability Health Chart */}
                     <div className="card lg:col-span-2">
                       <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                        <h3 className="card-title">🏢 London District Green Rating</h3>
+                        <h3 className="card-title">🏢 {cityInfo?.label || 'City'} District Green Rating</h3>
                         <span className="card-subtitle">Environmental indices scored from live ticket loads &amp; AQI levels</span>
                       </div>
                       <div className="h-[250px]">
@@ -1358,7 +1359,7 @@ export default function App() {
                               <span className="text-[9px] font-black px-1.5 py-0.5 rounded uppercase">{rec.priority} PRIO</span>
                             </div>
                             <p className="text-[10px] text-slate-500 leading-relaxed">{rec.description}</p>
-                            <div className="mt-auto pt-2 border-t border-slate-200/30 flex justify-between text-[9px] text-slate-400">
+                            <div className="mt-auto pt-2 border-t border-slate-200/30 flex justify-between text-[9px] text-slate-450">
                               <span>Impact: <strong>{rec.impact}</strong></span>
                               <span>Cost: <strong>{rec.cost}</strong></span>
                             </div>
@@ -1377,8 +1378,8 @@ export default function App() {
             <div className="flex flex-col gap-6">
               <div className="card">
                 <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-6">
-                  <h3 className="card-title"><FileText className="w-5 h-5 text-indigo-650" /> BBC London RSS News Channel</h3>
-                  <span className="card-subtitle">Real-time local feed fetched directly from BBC News RSS</span>
+                  <h3 className="card-title"><FileText className="w-5 h-5 text-indigo-650" /> {cityInfo?.label || 'City'} Local RSS News Channel</h3>
+                  <span className="card-subtitle">Real-time local feed fetched directly from local RSS news source</span>
                 </div>
                 
                 {liveNews && liveNews.length > 0 ? (
@@ -1540,7 +1541,7 @@ export default function App() {
           {/* TAB 7: CITIZEN SENTIMENT & SOCIAL PULSE */}
           {activeTab === 'pulse' && (
             <div className="flex flex-col gap-0">
-              <SentimentPulse isDarkMode={isDarkMode} />
+              <SentimentPulse isDarkMode={isDarkMode} cityInfo={cityInfo} />
             </div>
           )}
 

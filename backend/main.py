@@ -1926,16 +1926,22 @@ def export_audit_pdf():
     )
 
 @app.get("/api/sentiment/pulse")
-def get_sentiment_pulse():
+def get_sentiment_pulse(city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
     """
     Uses Gemini AI to analyze all citizen tickets, classify sentiment by district,
     identify trending civic topics, generate a city pulse score, keyword cloud,
-    and actionable policy recommendations.
+    and actionable policy recommendations. Accepts city name and coordinates.
     """
     tickets = db_get_tickets()
     actions = db_get_action_history()
 
-    districts = ["Westminster", "Lambeth", "Southwark", "Camden", "Islington", "Hackney"]
+    # Derive city-specific district/zone names from INDIA_CITY_LIST or use generic zones
+    city_entry = next((c for c in INDIA_CITY_LIST if c["label"].lower() == city.lower() or c["value"] == city.lower()), None)
+    if city_entry and city_entry.get("districts"):
+        districts = city_entry["districts"][:6]
+    else:
+        districts = [f"{city} North", f"{city} South", f"{city} East", f"{city} West", f"{city} Central", f"{city} Suburbs"]
+    
     categories = ["Roads & Bridges", "Utilities & Lighting", "Public Safety", "Environmental", "Social Services", "Transport"]
 
     if not gemini_available or not tickets:
@@ -2006,7 +2012,7 @@ Active Citizen Tickets ({len(tickets)} total):
 Recent System Actions:
 {recent_actions}
 
-London districts to analyze: {', '.join(districts)}
+{city} districts to analyze: {', '.join(districts)}
 Categories to analyze: {', '.join(categories)}
 
 Analyze the above data and produce a comprehensive sentiment pulse report. Return ONLY a valid JSON object with this exact structure (no markdown, no explanation):
@@ -2111,7 +2117,7 @@ Requirements:
             cat_counts[cat] = {"category": cat, "positive": max(1, cnt // 3), "neutral": max(1, cnt // 3), "negative": max(0, cnt - cnt // 3 * 2)}
         return {
             "city_pulse_score": max(25, min(85, int(60 + pos_count * 5 - neg_count * 8))),
-            "pulse_summary": f"Based on {total_tickets} civic reports, sentiment analysis indicates moderate urban stress with {neg_count} high-priority issues requiring immediate attention. Infrastructure and utilities are the primary concern areas across London districts.",
+            "pulse_summary": f"Based on {total_tickets} civic reports from {city}, sentiment analysis indicates moderate urban stress with {neg_count} high-priority issues requiring immediate attention. Infrastructure and utilities are the primary concern areas across {city} districts.",
             "overall_sentiment": {"positive": pos_count + 2, "neutral": neu_count + 1, "negative": neg_count, "urgent": urg_count},
             "districts": district_data,
             "trending_topics": [
@@ -2425,34 +2431,39 @@ def upvote_proposal(proposal_id: str):
 # FEATURE 24: CITIZEN COMPLAINT HEATMAP
 # ─────────────────────────────────────────────
 @app.get("/api/heatmap/complaints")
-def get_complaint_heatmap():
+def get_complaint_heatmap(city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
     """
     Groups citizen tickets and proposals by district, returning lat/lng centroids,
     ticket counts, and dominant category for heatmap rendering on Leaflet.
-    Tickets are mapped to districts via category; proposals have explicit district fields.
+    Now city-aware: uses selected Indian city coordinates to place heatmap bubbles.
     """
     from collections import Counter, defaultdict
 
-    # London district centroids
-    DISTRICT_CENTROIDS = {
-        "Westminster":  {"lat": 51.4975, "lng": -0.1357},
-        "Camden":       {"lat": 51.5290, "lng": -0.1255},
-        "Lambeth":      {"lat": 51.4607, "lng": -0.1163},
-        "Southwark":    {"lat": 51.5020, "lng": -0.0900},
-        "Islington":    {"lat": 51.5362, "lng": -0.1033},
-        "Hackney":      {"lat": 51.5450, "lng": -0.0553},
-    }
+    # Derive district names from INDIA_CITY_LIST or use generic zones
+    city_entry = next((c for c in INDIA_CITY_LIST if c["label"].lower() == city.lower() or c["value"] == city.lower()), None)
+    if city_entry and city_entry.get("districts") and len(city_entry["districts"]) >= 6:
+        dist_names = city_entry["districts"][:6]
+    else:
+        dist_names = [f"{city} North", f"{city} South", f"{city} East", f"{city} West", f"{city} Central", f"{city} Suburbs"]
 
-    # Map categories to districts (tickets don't have district field)
-    CAT_TO_DISTRICT = {
-        "Roads & Bridges":    "Westminster",
-        "Utilities & Lighting": "Lambeth",
-        "Environmental":      "Hackney",
-        "Transit & Trains":   "Southwark",
-        "Public Safety":      "Camden",
-        "Social Services":    "Islington",
-    }
+    # Create dynamic centroids around the city's lat/lng with small geographic offsets
+    offsets = [(0.03, -0.02), (-0.02, -0.02), (-0.01, 0.04), (0.01, 0.05), (0.00, 0.00), (0.02, 0.03)]
+    DISTRICT_CENTROIDS = {}
+    for i, name in enumerate(dist_names):
+        dlat, dlng = offsets[i]
+        DISTRICT_CENTROIDS[name] = {"lat": lat + dlat, "lng": lng + dlng}
+
     DISTRICTS = list(DISTRICT_CENTROIDS.keys())
+
+    # Map categories to districts
+    CAT_TO_DISTRICT = {
+        "Roads & Bridges":    DISTRICTS[0],
+        "Utilities & Lighting": DISTRICTS[1],
+        "Environmental":      DISTRICTS[2],
+        "Transit & Trains":   DISTRICTS[3],
+        "Public Safety":      DISTRICTS[4],
+        "Social Services":    DISTRICTS[5],
+    }
 
     district_counts = Counter()
     district_cats = defaultdict(list)
@@ -2476,14 +2487,14 @@ def get_complaint_heatmap():
         proposal_rows = db_get_proposals() or []
         for row in proposal_rows:
             cat = row.get("category", "")
-            dist = row.get("district", "Westminster")
-            if dist in DISTRICT_CENTROIDS:
-                district_counts[dist] += 1
-                district_cats[dist].append(cat)
+            dist_raw = row.get("district", DISTRICTS[0])
+            dist = dist_raw if dist_raw in DISTRICT_CENTROIDS else DISTRICTS[0]
+            district_counts[dist] += 1
+            district_cats[dist].append(cat)
     except Exception as e:
         logger.warning(f"Heatmap proposals query error: {e}")
 
-    # Ensure all 6 districts appear
+    # Ensure all districts appear
     for d in DISTRICT_CENTROIDS:
         if d not in district_counts:
             district_counts[d] = 0
