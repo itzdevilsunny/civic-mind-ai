@@ -109,19 +109,6 @@ export default function App() {
   // Sign in/out and Role state
   const [isSignedIn, setIsSignedIn] = useState(() => localStorage.getItem('civicmind_signed_in') === 'true');
   const [userRole, setUserRole] = useState(() => localStorage.getItem('civicmind_user_role') || 'citizen');
-  const [isTopNavVisible, setIsTopNavVisible] = useState(false);
-
-  useEffect(() => {
-    const handleMouseMoveGlobal = (e) => {
-      if (e.clientY <= 50) {
-        setIsTopNavVisible(true);
-      } else if (e.clientY > 80) {
-        setIsTopNavVisible(false);
-      }
-    };
-    window.addEventListener('mousemove', handleMouseMoveGlobal);
-    return () => window.removeEventListener('mousemove', handleMouseMoveGlobal);
-  }, []);
 
   const handleSignIn = (role) => {
     setUserRole(role);
@@ -736,207 +723,178 @@ export default function App() {
               <span className="text-2xl">🏙️</span>
               <span className="font-extrabold tracking-tight bg-gradient-to-r from-blue-600 to-orange-500" style={{ backgroundClip: 'text', WebkitBackgroundClip: 'text', color: 'transparent', fontSize: '1.25rem' }}>CivicMind AI</span>
             </div>
-            
-            <div className="flex items-center gap-4" style={{ display: 'flex', alignItems: 'center' }}>
-              <LanguageSwitcher
-                selectedLang={selectedLang}
-                onLangChange={setSelectedLang}
-                isDarkMode={isDarkMode}
-              />
-              
-              <button 
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-750 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all"
-                style={{ cursor: 'pointer', background: 'none', border: '1px solid rgba(148, 163, 184, 0.2)', padding: '6px 10px', borderRadius: '6px' }}
-                title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
-              >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <LanguageSwitcher selectedLang={selectedLang} onLangChange={setSelectedLang} isDarkMode={isDarkMode} />
+              <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ cursor: 'pointer', background: 'none', border: '1px solid rgba(148,163,184,0.2)', padding: '6px 10px', borderRadius: '6px' }} title={isDarkMode ? 'Light Mode' : 'Dark Mode'}>
                 {isDarkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
               </button>
-
-              <button
-                onClick={() => handleSignIn('citizen')}
-                className="px-4 py-2 text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all cursor-pointer"
-                style={{ cursor: 'pointer', padding: '6px 12px', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}
-              >
-                Log In as Citizen
-              </button>
-              
-              <button
-                onClick={() => handleSignIn('admin')}
-                className="px-4 py-2 text-xs font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-all cursor-pointer"
-                style={{ cursor: 'pointer', padding: '6px 12px', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold' }}
-              >
-                Log In as Admin
-              </button>
+              <button onClick={() => handleSignIn('citizen')} style={{ cursor: 'pointer', padding: '7px 16px', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', fontSize: '13px', fontWeight: 700, background: 'rgba(16,185,129,0.08)', color: '#059669' }}>Log In as Citizen</button>
+              <button onClick={() => handleSignIn('admin')} style={{ cursor: 'pointer', padding: '7px 16px', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, background: 'linear-gradient(135deg,#3b82f6,#6366f1)', color: 'white' }}>Log In as Admin</button>
             </div>
           </div>
         </header>
 
-        {/* Hero Section */}
-        <section className="landing-hero" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <div className="landing-section-tag" style={{ color: '#f97316', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Empowering Smarter Municipal Governance</div>
-          <h1 className="landing-title" style={{ fontSize: '3rem', fontWeight: 850, margin: '1rem 0', lineHeight: 1.2 }}>
-            Civic Decision Intelligence,<br />Driven by Multi-Agent AI
-          </h1>
-          <p className="landing-subtitle" style={{ fontSize: '1.1rem', maxW: '760px', margin: '0 auto 2rem auto', lineHeight: 1.6, color: '#64748b' }}>
-            CivicMind AI connects citizens and administrators through real-time traffic monitoring, predictive environmental sensing, and automated agent dispatching to resolve municipal infrastructure tickets efficiently.
-          </p>
-          
-          <div className="flex justify-center gap-4" style={{ display: 'flex', gap: '15px' }}>
-            <button
-              onClick={() => handleSignIn('citizen')}
-              className="px-6 py-3 font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 rounded-lg shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.02] transition-all cursor-pointer"
-              style={{ cursor: 'pointer', padding: '12px 24px', border: 'none', borderRadius: '8px', fontWeight: 'bold', color: '#fff', background: 'linear-gradient(135deg, #10b981, #0d9488)' }}
-            >
-              Access Citizen Portal
-            </button>
-            <button
-              onClick={() => handleSignIn('admin')}
-              className="px-6 py-3 font-bold text-white bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg hover:shadow-blue-500/20 hover:scale-[1.02] transition-all cursor-pointer"
-              style={{ cursor: 'pointer', padding: '12px 24px', border: 'none', borderRadius: '8px', fontWeight: 'bold', color: '#fff', background: 'linear-gradient(135deg, #3b82f6, #4f46e5)' }}
-            >
-              Access Admin Console
-            </button>
-          </div>
-
-          <div className="landing-hero-image-wrapper" style={{ marginTop: '3rem', maxWidth: '850px', border: '2px solid rgba(226, 232, 240, 0.8)', borderRadius: '12px', overflow: 'hidden' }}>
-            <img 
-              src="/civic_mind_ai_hero.png" 
-              alt="CivicMind AI Hero Dashboard Preview" 
-              className="landing-hero-image" 
-            />
-          </div>
-        </section>
-
-        {/* Features Grid */}
-        <section className="landing-features-section">
-          <div className="landing-section-tag" style={{ color: '#f97316', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Comprehensive Feature Set</div>
-          <h2 className="landing-section-title" style={{ textAlign: 'center', fontSize: '2rem', fontWeight: 800, margin: '1rem 0 3rem 0' }}>How CivicMind AI Helps Your Community</h2>
-          
-          <div className="landing-features-grid" style={{ display: 'grid', gap: '30px' }}>
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon-wrapper">
-                <Building2 className="w-6 h-6" />
-              </div>
-              <h3 className="landing-feature-title">Real-Time City Overview</h3>
-              <p className="landing-feature-desc">
-                Get a unified view of city health metrics, environmental quality, traffic safety scores, and open ticket volumes at a glance. Backed by simulated and live-updated sensor networks.
-              </p>
+        {/* ═══ HERO ═══ */}
+        <section style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)', padding: '100px 24px 80px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: '10%', left: '5%', width: '300px', height: '300px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(249,115,22,0.15) 0%,transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', bottom: '10%', right: '5%', width: '400px', height: '400px', borderRadius: '50%', background: 'radial-gradient(circle,rgba(99,102,241,0.18) 0%,transparent 70%)', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', maxWidth: '900px', margin: '0 auto' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 16px', borderRadius: '99px', background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '28px' }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f97316', display: 'inline-block' }} />
+              <span style={{ color: '#fb923c', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Powered by Gemini AI · Live for 100+ Indian Cities</span>
             </div>
-
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon-wrapper">
-                <Users className="w-6 h-6" />
-              </div>
-              <h3 className="landing-feature-title">Citizen Proposal & Senate Chamber</h3>
-              <p className="landing-feature-desc">
-                Submit community proposals, gather support through citizen upvotes, and watch as our AI-powered municipal senate debates, votes on, and passes policies automatically.
-              </p>
-              <img 
-                src="/citizen_proposal_mockup.png" 
-                alt="Citizen Proposal Senate Interface" 
-                className="landing-feature-img"
-              />
+            <h1 style={{ fontSize: 'clamp(2.5rem,6vw,4.5rem)', fontWeight: 900, color: '#ffffff', lineHeight: 1.1, margin: '0 0 24px', letterSpacing: '-0.03em' }}>
+              Smarter Cities Start With<br />
+              <span style={{ background: 'linear-gradient(90deg,#f97316,#fb923c,#fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Decision Intelligence</span>
+            </h1>
+            <p style={{ fontSize: '1.2rem', color: '#94a3b8', maxWidth: '680px', margin: '0 auto 40px', lineHeight: 1.7 }}>
+              CivicMind AI is India's first multi-agent civic governance platform — bringing real-time environmental data, AI-powered dispatch, citizen participation, and budget transparency into a single command center.
+            </p>
+            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '60px' }}>
+              <button onClick={() => handleSignIn('citizen')} onMouseOver={e => e.currentTarget.style.transform='scale(1.04)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'} style={{ cursor: 'pointer', padding: '14px 32px', border: 'none', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 8px 25px rgba(16,185,129,0.35)', transition: 'transform 0.2s' }}>🏘️ Enter as Citizen</button>
+              <button onClick={() => handleSignIn('admin')} onMouseOver={e => e.currentTarget.style.transform='scale(1.04)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'} style={{ cursor: 'pointer', padding: '14px 32px', border: 'none', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'linear-gradient(135deg,#6366f1,#3b82f6)', boxShadow: '0 8px 25px rgba(99,102,241,0.35)', transition: 'transform 0.2s' }}>⚙️ Enter as Administrator</button>
             </div>
-
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon-wrapper">
-                <Bot className="w-6 h-6" />
+            <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(249,115,22,0.2)', maxWidth: '860px', margin: '0 auto' }}>
+              <div style={{ background: '#1e293b', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
+                <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '8px' }}>civic-mind-ai.vercel.app — CivicMind AI Dashboard</span>
               </div>
-              <h3 className="landing-feature-title">AI Dispatcher & Copilot Control</h3>
-              <p className="landing-feature-desc">
-                City Administrators can coordinate municipal dispatch workflows using Gemini-powered copilot assistance. Monitor and assign tickets to field crews, optimize traffic lights, or deploy emergency repair crews dynamically.
-              </p>
-              <img 
-                src="/ai_dispatcher_mockup.png" 
-                alt="AI Dispatcher Operations Control" 
-                className="landing-feature-img"
-              />
-            </div>
-
-            <div className="landing-feature-card">
-              <div className="landing-feature-icon-wrapper">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <h3 className="landing-feature-title">City Budget & Sustainability Radar</h3>
-              <p className="landing-feature-desc">
-                Audit city development funds and operational expenses. Track carbon emissions, green energy yields, solar battery capacity, and neighborhood air quality indices using real-time analytics.
-              </p>
+              <img src="/civic_dashboard_hero.png" alt="CivicMind AI Dashboard Preview" style={{ width: '100%', display: 'block' }} />
             </div>
           </div>
         </section>
 
-        {/* Roles Breakdown */}
-        <section className="landing-roles-section">
-          <div className="landing-roles-container">
-            <div className="landing-section-tag" style={{ color: '#f97316', fontWeight: 800, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.1em', textAlign: 'center' }}>Role-Based Access</div>
-            <h2 className="landing-section-title" style={{ textAlign: 'center', fontSize: '2rem', fontWeight: 800, margin: '1rem 0 3rem 0' }}>Designed for Both Citizens and Public Servants</h2>
-            
-            <div className="landing-roles-grid" style={{ display: 'grid', gap: '30px' }}>
-              <div className="landing-role-card citizen-border">
-                <span className="landing-role-badge citizen">Citizen Portal</span>
-                <h3 className="text-xl font-extrabold mb-4" style={{ fontSize: '1.25rem', fontWeight: 800 }}>For the Community</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed" style={{ fontSize: '0.9rem', lineHeight: 1.5, color: '#64748b' }}>
-                  Participate actively in municipal development. Report issues like potholes or water leaks, track resolution stages, upvote public infrastructure projects, and view live transit/news channels.
-                </p>
-                <ul className="landing-role-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '0px' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className="text-emerald-500 font-bold">✔</span>
-                    <span>Submit and track tickets for road repairs or utility leaks</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className="text-emerald-500 font-bold">✔</span>
-                    <span>Upvote proposals in the Senate Chamber to advocate for your neighborhood</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className="text-emerald-500 font-bold">✔</span>
-                    <span>View real-time public transit schedules, live weather, and local news</span>
-                  </li>
+        {/* ═══ STATS ═══ */}
+        <section style={{ background: '#ffffff', borderBottom: '1px solid #f1f5f9', padding: '40px 24px' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '32px', textAlign: 'center' }}>
+            {[{ num: '100+', label: 'Indian Cities Supported', icon: '🏙️' },{ num: '11', label: 'AI Agent Modules', icon: '🤖' },{ num: 'Real-Time', label: 'Live Data Feeds', icon: '📡' },{ num: 'Gemini', label: 'AI-Powered Analysis', icon: '✨' },{ num: '2-Role', label: 'Citizen & Admin Access', icon: '🔐' }].map((stat, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '28px' }}>{stat.icon}</span>
+                <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>{stat.num}</span>
+                <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>{stat.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ═══ FEATURES DEEP DIVE ═══ */}
+        <section style={{ background: '#f8fafc', padding: '90px 24px' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+              <span style={{ display: 'inline-block', padding: '5px 14px', background: 'rgba(249,115,22,0.1)', color: '#f97316', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '99px', border: '1px solid rgba(249,115,22,0.25)', marginBottom: '16px' }}>Complete Feature Set</span>
+              <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px', letterSpacing: '-0.02em' }}>Everything Your City Needs,<br />In One Platform</h2>
+              <p style={{ fontSize: '1.05rem', color: '#64748b', maxWidth: '600px', margin: '0 auto', lineHeight: 1.7 }}>11 intelligent modules working together — from real-time environmental monitoring to AI-powered governance decisions.</p>
+            </div>
+
+            {[
+              { side: 'right', img: '/civic_dashboard_hero.png', imgAlt: 'City Health Dashboard', tag: 'Module 01 · Overview', tagColor: '#6366f1', title: 'Live City Health Radar & AI Diagnosis', desc: 'Get an instant multi-dimensional view of your city\'s pulse. The Civic Health Radar aggregates scores across Transport, Environment, Infrastructure, Healthcare, Safety, and Digital Services — all updated live from sensor networks.', features: ['Real-time radar chart across 6 civic dimensions','Gemini AI writes automated diagnostic reports','Weather station with temperature, humidity & UV index','Live AQI forecasts for the next 24 hours with PM2.5 levels','Department performance indicators & open ticket stats'], iconColor: 'linear-gradient(135deg,#6366f1,#8b5cf6)' },
+              { side: 'left', img: '/transport_map_feature.png', imgAlt: 'Transport Dashboard', tag: 'Module 02–03 · Transport & Traffic', tagColor: '#0ea5e9', title: 'Real-Time Transit & Traffic Intelligence', desc: 'Monitor live Metro, Bus, and Bike-sharing networks. Track route statuses, congestion zones, junction camera feeds, and predict traffic delays using historical + live data fusion.', features: ['Live Metro/Suburban rail line status (Good/Delayed/Suspended)','Active bus count and route deviation tracking','Bike-sharing station search with dock availability','Traffic junction camera feeds with AI incident detection','Predictive congestion alerts for next 2 hours'], iconColor: 'linear-gradient(135deg,#0ea5e9,#06b6d4)' },
+              { side: 'right', img: '/sentiment_pulse_feature.png', imgAlt: 'Sentiment Pulse', tag: 'Module 07 · Citizen Pulse', tagColor: '#a855f7', title: 'Citizen Sentiment & Social Pulse', desc: 'Understand what citizens are feeling right now. Our AI scans live social media signals, local news sentiment, and public service ratings — then Gemini synthesizes it into actionable governance insight.', features: ['Live social mood radar across Happy, Frustrated, Concerned, Satisfied','District-wise heatmap of public sentiment scores','Real-time social feed from Hindustan Times, Dainik Jagaran','Gemini AI narrative summary of public opinion trends','Week-over-week sentiment trend charts with anomaly alerts'], iconColor: 'linear-gradient(135deg,#a855f7,#ec4899)' },
+              { side: 'left', img: '/ai_dispatch_feature.png', imgAlt: 'AI Dispatch', tag: 'Module 06 · Dispatch & Copilot', tagColor: '#f59e0b', title: 'AI-Powered Dispatch & Field Coordination', desc: 'Administrators get a Gemini-powered Copilot that triages tickets, suggests field officer assignments, and automates routine dispatch decisions — cutting response times by up to 60%.', features: ['Priority-tagged incident queue (Critical/High/Medium/Low)','AI Copilot suggests officer assignments based on skill + proximity','One-click dispatch with automated confirmation messages','Multi-agent coordination log — see all AI decisions in real-time','SLA compliance tracker with escalation alerts'], iconColor: 'linear-gradient(135deg,#f59e0b,#f97316)' },
+              { side: 'right', img: '/budget_analytics_feature.png', imgAlt: 'Budget Analytics', tag: 'Module 08 · Budget & Sustainability', tagColor: '#10b981', title: 'City Budget & Sustainability Analytics', desc: 'Full financial transparency for citizens. Track how municipal budgets are allocated, monitor carbon emissions, solar energy output, and compare your city\'s sustainability score against national benchmarks.', features: ['Department-wise budget breakdown: Roads, Healthcare, Education, Water','CO₂ emissions trend vs. net-zero targets','Solar panel output, battery storage & grid feed-in metrics','Ward-level expenditure comparison with equity scoring','AI-generated budget health report with recommendations'], iconColor: 'linear-gradient(135deg,#10b981,#059669)' },
+            ].map((feat, fi) => (
+              <div key={fi} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center', marginBottom: fi < 4 ? '100px' : 0 }}>
+                {feat.side === 'left' && <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', border: '1px solid #e2e8f0' }}><img src={feat.img} alt={feat.imgAlt} style={{ width: '100%', display: 'block' }} /></div>}
+                <div>
+                  <span style={{ display: 'inline-block', padding: '4px 12px', background: feat.tagColor + '18', color: feat.tagColor, fontWeight: 700, fontSize: '11px', borderRadius: '6px', marginBottom: '20px', border: `1px solid ${feat.tagColor}30` }}>{feat.tag}</span>
+                  <h3 style={{ fontSize: '1.9rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px', lineHeight: 1.2 }}>{feat.title}</h3>
+                  <p style={{ color: '#475569', lineHeight: 1.8, marginBottom: '24px', fontSize: '15px' }}>{feat.desc}</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {feat.features.map((f, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <span style={{ width: '20px', height: '20px', borderRadius: '50%', background: feat.iconColor, color: 'white', fontSize: '11px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>✓</span>
+                        <span style={{ fontSize: '14px', color: '#334155' }}>{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {feat.side === 'right' && <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', border: '1px solid #e2e8f0' }}><img src={feat.img} alt={feat.imgAlt} style={{ width: '100%', display: 'block' }} /></div>}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ═══ ALL 11 MODULES ═══ */}
+        <section style={{ background: '#0f172a', padding: '90px 24px' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+              <span style={{ display: 'inline-block', padding: '5px 14px', background: 'rgba(249,115,22,0.15)', color: '#fb923c', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '99px', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '16px' }}>All 11 Intelligence Modules</span>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#ffffff', margin: '0 0 12px', letterSpacing: '-0.02em' }}>Every Tool You Need to Govern Better</h2>
+              <p style={{ color: '#94a3b8', fontSize: '1rem', maxWidth: '560px', margin: '0 auto' }}>From live data to AI decisions — every module works together in real time.</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '20px' }}>
+              {[{ icon: '🏙️', title: 'City Overview', desc: 'Civic Health Radar, AI Diagnosis, weather station & department KPIs', color: '#6366f1' },{ icon: '🚇', title: 'Live Transportation', desc: 'Metro/bus/bike live status, route maps, dock search & occupancy', color: '#0ea5e9' },{ icon: '🎥', title: 'Traffic & Map', desc: 'Junction camera feeds, congestion heatmaps & AI incident detection', color: '#f59e0b' },{ icon: '🌤️', title: 'Weather & Air Quality', desc: '24hr AQI forecast, PM2.5/PM10 levels, UV index, rainfall alerts', color: '#10b981' },{ icon: '📰', title: 'City News Feed', desc: 'Live news from HT, Dainik Jagaran & local channels per city', color: '#ec4899' },{ icon: '🏛️', title: 'Senate Chamber', desc: 'Citizen proposals, AI-powered voting debates & policy passing', color: '#8b5cf6' },{ icon: '💬', title: 'Sentiment Pulse', desc: 'Social mood radar, district heatmaps & Gemini AI narrative', color: '#a855f7' },{ icon: '💰', title: 'City Budget', desc: 'Department spending, sustainability metrics & CO₂ tracking', color: '#22c55e' },{ icon: '💡', title: 'Proposals', desc: 'Submit, upvote & track community infrastructure proposals', color: '#f97316' },{ icon: '🔧', title: 'Predictive Maintenance', desc: 'AI failure prediction for electrical grids, roads & water mains', color: '#ef4444' },{ icon: '🤖', title: 'Agent Log', desc: 'Full multi-agent communication timeline & AI decision audit trail', color: '#64748b' }].map((mod, i) => (
+                <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '22px', transition: 'all 0.2s', cursor: 'default' }} onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = mod.color + '50'; }} onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: mod.color + '20', border: `1px solid ${mod.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>{mod.icon}</div>
+                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9' }}>{mod.title}</span>
+                  </div>
+                  <p style={{ fontSize: '13px', color: '#64748b', margin: 0, lineHeight: 1.6 }}>{mod.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ═══ ROLES ═══ */}
+        <section style={{ background: '#f8fafc', padding: '90px 24px' }}>
+          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+              <span style={{ display: 'inline-block', padding: '5px 14px', background: 'rgba(249,115,22,0.1)', color: '#f97316', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '99px', border: '1px solid rgba(249,115,22,0.25)', marginBottom: '16px' }}>Who Is This For?</span>
+              <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px', letterSpacing: '-0.02em' }}>Two Roles, One Platform</h2>
+              <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '500px', margin: '0 auto' }}>Log in as a Citizen to participate, or as an Admin to govern.</p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px' }}>
+              <div style={{ background: '#ffffff', border: '2px solid #10b981', borderRadius: '20px', padding: '36px', boxShadow: '0 8px 32px rgba(16,185,129,0.08)' }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', marginBottom: '20px' }}>🏘️</div>
+                <span style={{ display: 'inline-block', padding: '3px 10px', background: '#d1fae5', color: '#065f46', fontSize: '11px', fontWeight: 700, borderRadius: '6px', marginBottom: '12px' }}>CITIZEN PORTAL</span>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px' }}>For Every Indian</h3>
+                <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.7, marginBottom: '24px' }}>Participate in shaping your city. Submit grievances, track repairs, upvote proposals, access live transit info, and see your tax money at work — all in one place.</p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {['Submit & track civic tickets (roads, water, electricity)','View live transit routes & bus/metro schedules','Upvote community proposals in Senate Chamber','Read city news from regional channels','Check AQI, weather & urban air quality alerts','See city budget transparency reports'].map((f, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13.5px', color: '#334155' }}><span style={{ color: '#10b981', fontWeight: 800, flexShrink: 0 }}>✔</span> {f}</li>
+                  ))}
                 </ul>
-                <button
-                  onClick={() => handleSignIn('citizen')}
-                  className="w-full py-2.5 font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-all cursor-pointer"
-                  style={{ cursor: 'pointer', padding: '10px 0', border: 'none', borderRadius: '6px', background: '#10b981', color: 'white', fontWeight: 'bold', width: '100%', marginTop: '20px' }}
-                >
-                  Enter as Citizen
-                </button>
+                <button onClick={() => handleSignIn('citizen')} style={{ width: '100%', padding: '12px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg,#10b981,#059669)', color: 'white', fontWeight: 800, fontSize: '14px', cursor: 'pointer' }}>🏘️ Enter as Citizen →</button>
               </div>
-
-              <div className="landing-role-card admin-border">
-                <span className="landing-role-badge admin">Admin Console</span>
-                <h3 className="text-xl font-extrabold mb-4" style={{ fontSize: '1.25rem', fontWeight: 800 }}>For Municipal Leaders</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed" style={{ fontSize: '0.9rem', lineHeight: 1.5, color: '#64748b' }}>
-                  Oversee metropolitan performance. Monitor multi-agent communication networks, review system warnings, manage ticket routing, run predictive maintenance simulators, and download audit PDF reports.
-                </p>
-                <ul className="landing-role-list" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '0px' }}>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className="text-blue-500 font-bold">✔</span>
-                    <span>Access predictive analytics for electrical grids and water mains</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className="text-blue-500 font-bold">✔</span>
-                    <span>Direct AI Copilot actions for automatic dispatch of field officers</span>
-                  </li>
-                  <li style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
-                    <span className="text-blue-500 font-bold">✔</span>
-                    <span>Analyze live telemetry from traffic junctions and city cameras</span>
-                  </li>
+              <div style={{ background: '#ffffff', border: '2px solid #6366f1', borderRadius: '20px', padding: '36px', boxShadow: '0 8px 32px rgba(99,102,241,0.08)' }}>
+                <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#6366f1,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', marginBottom: '20px' }}>⚙️</div>
+                <span style={{ display: 'inline-block', padding: '3px 10px', background: '#e0e7ff', color: '#3730a3', fontSize: '11px', fontWeight: 700, borderRadius: '6px', marginBottom: '12px' }}>ADMIN CONSOLE</span>
+                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px' }}>For Municipal Leaders</h3>
+                <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.7, marginBottom: '24px' }}>Command your city's operations center. Monitor agents, resolve critical incidents, run predictive maintenance, analyze multi-ward data, and download governance audit reports.</p>
+                <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {['AI Copilot for automated dispatch & ticket routing','Multi-agent timeline & communication audit log','Predictive maintenance for electrical, roads & water','What-if simulator for policy impact analysis','City budget management & sustainability tracking','Full PDF governance report export'].map((f, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '13.5px', color: '#334155' }}><span style={{ color: '#6366f1', fontWeight: 800, flexShrink: 0 }}>✔</span> {f}</li>
+                  ))}
                 </ul>
-                <button
-                  onClick={() => handleSignIn('admin')}
-                  className="w-full py-2.5 font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all cursor-pointer"
-                  style={{ cursor: 'pointer', padding: '10px 0', border: 'none', borderRadius: '6px', background: '#3b82f6', color: 'white', fontWeight: 'bold', width: '100%', marginTop: '20px' }}
-                >
-                  Enter as Administrator
-                </button>
+                <button onClick={() => handleSignIn('admin')} style={{ width: '100%', padding: '12px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg,#6366f1,#3b82f6)', color: 'white', fontWeight: 800, fontSize: '14px', cursor: 'pointer' }}>⚙️ Enter as Administrator →</button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Landing Footer */}
-        <footer className="landing-footer" style={{ padding: '3rem 0', textAlign: 'center', background: '#0f172a', color: '#94a3b8' }}>
-          <p className="text-sm">© {new Date().getFullYear()} CivicMind AI Platform. Empowering cities with agents of change.</p>
+        {/* ═══ CTA ═══ */}
+        <section style={{ background: 'linear-gradient(135deg,#0f172a,#1e1b4b)', padding: '90px 24px', textAlign: 'center' }}>
+          <div style={{ maxWidth: '680px', margin: '0 auto' }}>
+            <div style={{ fontSize: '48px', marginBottom: '20px' }}>🚀</div>
+            <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#ffffff', margin: '0 0 16px', letterSpacing: '-0.02em' }}>Ready to Experience the Future of Civic Governance?</h2>
+            <p style={{ color: '#94a3b8', fontSize: '1.05rem', marginBottom: '40px', lineHeight: 1.7 }}>Join thousands of citizens and administrators making smarter decisions with CivicMind AI — powered by Gemini, built for Bharat.</p>
+            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button onClick={() => handleSignIn('citizen')} style={{ cursor: 'pointer', padding: '14px 36px', border: 'none', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 8px 25px rgba(16,185,129,0.3)' }}>🏘️ Get Started as Citizen</button>
+              <button onClick={() => handleSignIn('admin')} style={{ cursor: 'pointer', padding: '14px 36px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'rgba(255,255,255,0.07)' }}>⚙️ Admin Console</button>
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer style={{ padding: '32px 24px', textAlign: 'center', background: '#020617', color: '#475569', borderTop: '1px solid #1e293b' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ fontSize: '18px' }}>🏙️</span><span style={{ fontWeight: 700, color: '#94a3b8', fontSize: '14px' }}>CivicMind AI</span></div>
+            <p style={{ fontSize: '13px', margin: 0 }}>© {new Date().getFullYear()} CivicMind AI Platform. Empowering cities with agents of change. Built for Bharat 🇮🇳</p>
+            <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}><span>Powered by Gemini AI</span><span>•</span><span>Open Source on GitHub</span></div>
+          </div>
         </footer>
       </div>
     );
