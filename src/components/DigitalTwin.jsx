@@ -247,9 +247,12 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
       .catch(err => console.error('Heatmap fetch error:', err));
   }, [cityInfo]);
 
-  // Fetch emergency services on mount
+  // Fetch emergency services when cityInfo changes
   useEffect(() => {
-    fetch('/api/emergency/services')
+    const params = cityInfo
+      ? `?lat=${cityInfo.lat}&lng=${cityInfo.lng}`
+      : '';
+    fetch(`/api/emergency/services${params}`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -257,7 +260,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
         }
       })
       .catch(err => console.error("Failed to load emergency services:", err));
-  }, []);
+  }, [cityInfo]);
 
   // Dynamic incident support
   useEffect(() => {

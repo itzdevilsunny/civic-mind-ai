@@ -137,9 +137,9 @@ def init_db():
         cursor.execute("SELECT COUNT(*) FROM tickets")
         if cursor.fetchone()[0] == 0:
             initial_seed = [
-                ('LND-9482', 'Pothole on Piccadilly Circus roundabout', 'Roads & Bridges', 'Medium', 'In Progress', 'Transport for London', 'Marcus Vance', 3, 'Large pothole in center lane causing traffic slow downs.', '2026-07-11 21:00:00'),
-                ('LND-9388', 'Water main leakage near Hyde Park exit', 'Utilities & Lighting', 'High', 'Resolved', 'Thames Water', 'Elena Rostova', 4, 'Commercial dumpsters are completely full and garbage is spilling onto the pedestrian path.', '2026-07-10 14:15:00'),
-                ('LND-9210', 'Flickering streetlights outside Senior Care Center', 'Utilities & Lighting', 'Critical', 'Assigned', 'Power Grid Commission', 'Julian Drake', 2, 'Three streetlights are flickering or off, making the walkway dangerous for residents.', '2026-07-11 18:45:00')
+                ('CMI-9482', 'Pothole on SV Road near Bandra station crossing', 'Roads & Bridges', 'Medium', 'In Progress', 'Public Works Department (PWD)', 'Rajesh Sharma', 3, 'Large pothole in center lane causing traffic slow downs.', '2026-07-11 21:00:00'),
+                ('CMI-9388', 'Water main leakage near residential block exit', 'Utilities & Lighting', 'High', 'Resolved', 'Water Board & Power Corporation', 'Amit Patel', 4, 'Main water pipe leaking, causing water pooling on streets.', '2026-07-10 14:15:00'),
+                ('CMI-9210', 'Flickering streetlights outside Community Senior Home', 'Utilities & Lighting', 'Critical', 'Assigned', 'Water Board & Power Corporation', 'Sanjay Dutt', 2, 'Three streetlights are flickering or off, making the walkway dangerous for residents.', '2026-07-11 18:45:00')
             ]
             cursor.executemany("INSERT INTO tickets (id, title, category, priority, status, department, officer, stage, description, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", initial_seed)
         
@@ -634,7 +634,7 @@ def get_sustainability_metrics():
     district_ranks.sort(key=lambda x: x["score"], reverse=True)
     
     # Gemini AI Sustainability analysis
-    prompt = f"""You are a London municipal Sustainability Director. Analyze this city data:
+    prompt = f"""You are an Indian municipal Sustainability Director. Analyze this city data:
 Solar Array Output: {solar_output} MW (Efficiency: {solar_efficiency}%)
 Renewable Energy Grid Mix: {renewable_mix}%
 Municipal Carbon Savings: {carbon_saved} Tonnes CO2/hr
@@ -2171,11 +2171,31 @@ class EmergencyDispatchRequest(BaseModel):
     ticket_id: str
 
 @app.get("/api/emergency/services")
-def get_emergency_services():
+def get_emergency_services(lat: float = 19.076, lng: float = 72.8777):
     """
-    Returns the roster of emergency service hubs.
+    Returns the roster of emergency service hubs, dynamically shifted near the city coordinates
+    and localized for an Indian civic setting.
     """
-    return db_get_emergency_services()
+    services = db_get_emergency_services()
+    ldn_lat, ldn_lng = 51.5074, -0.1278
+    for s in services:
+        if s["id"] == "EMG-HOSP1":
+            s["lat"] = lat + (51.4988 - ldn_lat)
+            s["lon"] = lng + (-0.1189 - ldn_lng)
+            s["name"] = "City Government General Hospital"
+        elif s["id"] == "EMG-FIRE1":
+            s["lat"] = lat + (51.4947 - ldn_lat)
+            s["lon"] = lng + (-0.1165 - ldn_lng)
+            s["name"] = "City Fire & Emergency Services Station"
+        elif s["id"] == "EMG-POL1":
+            s["lat"] = lat + (51.5079 - ldn_lat)
+            s["lon"] = lng + (-0.1265 - ldn_lng)
+            s["name"] = "Central Police Precinct Command"
+        elif s["id"] == "EMG-AMB1":
+            s["lat"] = lat + (51.5033 - ldn_lat)
+            s["lon"] = lng + (-0.1123 - ldn_lng)
+            s["name"] = "Municipal Ambulance Depot"
+    return services
 
 @app.post("/api/emergency/dispatch")
 def emergency_dispatch(payload: EmergencyDispatchRequest, background_tasks: BackgroundTasks):
@@ -2239,17 +2259,17 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
     Intake citizen complaints, classify category and priority using Gemini,
     insert into database, and kick off the workflow timeline.
     """
-    ticket_id = f"LND-{uuid.uuid4().hex[:4].upper()}"
+    ticket_id = f"CMI-{uuid.uuid4().hex[:4].upper()}"
     departments = {
-        "Sanitation & Waste": "Environmental Services",
-        "Utilities & Lighting": "Power Grid Commission",
-        "Roads & Bridges": "Transport for London",
-        "Noise & Disturbance": "Public Safety Bureau",
-        "Traffic Anomaly": "Transport for London"
+        "Sanitation & Waste": "Municipal Solid Waste Management",
+        "Utilities & Lighting": "Water Board & Power Corporation",
+        "Roads & Bridges": "Public Works Department (PWD)",
+        "Noise & Disturbance": "City Police & Law Enforcement",
+        "Traffic Anomaly": "City Transit Authority"
     }
     
     dept = departments.get(complaint.category, "Municipal Services")
-    officers = ["Elena Rostova", "Julian Drake", "Marcus Vance", "David Miller", "Sarah Jenkins"]
+    officers = ["Rajesh Sharma", "Amit Patel", "Sanjay Dutt", "Priya Nair", "Sunita Rao"]
     officer = officers[hash(ticket_id) % len(officers)]
     
     refined_category = complaint.category
@@ -2268,10 +2288,10 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
             Based on this, output a JSON object containing:
             "category": Choose from ["Sanitation & Waste", "Utilities & Lighting", "Roads & Bridges", "Noise & Disturbance", "Traffic Anomaly"]
             "priority": Choose from ["Low", "Medium", "High", "Critical"]
-            "department": Choose from ["Environmental Services", "Power Grid Commission", "Transport for London", "Public Safety Bureau"]
+            "department": Choose from ["Municipal Solid Waste Management", "Water Board & Power Corporation", "Public Works Department (PWD)", "City Police & Law Enforcement", "City Transit Authority"]
             
             Format your response strictly as raw JSON, e.g.:
-            {{"category": "Utilities & Lighting", "priority": "High", "department": "Power Grid Commission"}}
+            {{"category": "Utilities & Lighting", "priority": "High", "department": "Water Board & Power Corporation"}}
             Do not write any markdown wrappers around the JSON.
             """
             response = model.generate_content(prompt)
@@ -3241,19 +3261,17 @@ Requirements:
 # FEATURE 13: CITY BUDGET & FINANCIAL INTELLIGENCE
 # ─────────────────────────────────────────────────────────
 
-# Department budget allocations (£M annually — London borough scale)
+# Department budget allocations (₹Cr annually — Indian municipal scale)
 DEPT_BUDGETS = {
-    "Transport for London":        {"annual": 4800, "color": "#6366f1"},
-    "Thames Water":                {"annual": 1200, "color": "#0ea5e9"},
-    "Thames Water & Power Grid":   {"annual": 1200, "color": "#0ea5e9"},
-    "Power Grid Commission":       {"annual": 980,  "color": "#f59e0b"},
-    "Metropolitan Police Service": {"annual": 3200, "color": "#ef4444"},
-    "London Environment Agency":   {"annual": 640,  "color": "#10b981"},
-    "London Borough Services":     {"annual": 890,  "color": "#8b5cf6"},
-    "Auto-Assigned":               {"annual": 500,  "color": "#94a3b8"},
+    "Public Works Department (PWD)":   {"annual": 4800, "color": "#6366f1"},
+    "Water Board & Power Corporation": {"annual": 2180, "color": "#0ea5e9"},
+    "City Police & Law Enforcement":   {"annual": 3200, "color": "#ef4444"},
+    "Municipal Solid Waste Management":{"annual": 890,  "color": "#10b981"},
+    "City Transit Authority":          {"annual": 1500, "color": "#ec4899"},
+    "Auto-Assigned":                   {"annual": 500,  "color": "#94a3b8"},
 }
 
-# Estimated cost per incident by priority (£K)
+# Estimated cost per incident by priority (₹ Lakhs)
 INCIDENT_COST = {"Critical": 85, "High": 42, "Medium": 18, "Low": 6}
 
 # Resolution time targets by priority (hours)
@@ -3357,30 +3375,30 @@ def get_budget_intelligence():
     ]
 
     # ── Gemini AI optimization recommendations ──
-    prompt = f"""You are a London municipal CFO AI advisor. Analyze this city budget data and provide financial optimization recommendations.
+    prompt = f"""You are an Indian municipal CFO AI advisor. Analyze this city budget data and provide financial optimization recommendations.
 
 Budget Health Score: {health_score}/100
-Total Annual Budget: £{total_annual_budget:,}M
-YTD Spend: £{round(total_spent_ytd, 1)}M ({ytd_pct}% of annual)
+Total Annual Budget: ₹{total_annual_budget:,} Cr
+YTD Spend: ₹{round(total_spent_ytd, 1)} Cr ({ytd_pct}% of annual)
 Total Incidents: {len(tickets)}
 Total Dispatches: {len(actions)}
 Average Efficiency: {round(avg_efficiency)}%
 Critical Budget Depts: {critical_depts}
 
 Department Summary:
-{chr(10).join(f"- {d['name']}: £{d['annual_budget_m']}M budget, {d['budget_used_pct']}% used, {d['efficiency_pct']}% efficiency" for d in departments[:5])}
+{chr(10).join(f"- {d['name']}: ₹{d['annual_budget_m']} Cr budget, {d['budget_used_pct']}% used, {d['efficiency_pct']}% efficiency" for d in departments[:5])}
 
 Provide a JSON response with this exact structure:
 {{
   "financial_summary": "2-sentence executive summary of budget health",
   "risk_level": "Low|Medium|High|Critical",
-  "savings_potential_m": <number, estimated £M that could be saved>,
+  "savings_potential_m": <number, estimated ₹Cr that could be saved>,
   "recommendations": [
     {{"title": "...", "description": "...", "impact_m": <number>, "priority": "High|Medium|Low", "dept": "..."}}
   ],
   "forecast_alert": "1-sentence forward-looking financial alert"
 }}
-Provide exactly 3 recommendations. Be specific and use real London budget figures. Only return JSON, no markdown."""
+Provide exactly 3 recommendations. Be specific and use real Indian municipal budget figures. Only return JSON, no markdown."""
 
     try:
         import google.generativeai as genai
@@ -3398,15 +3416,15 @@ Provide exactly 3 recommendations. Be specific and use real London budget figure
     except Exception as e:
         logger.warning(f"/api/budget/intelligence Gemini error (using fallback): {e}")
         ai_analysis = {
-            "financial_summary": f"London city budget is at {ytd_pct}% YTD utilization with a health score of {health_score}/100. {critical_depts} departments show elevated spend rates requiring attention.",
+            "financial_summary": f"City budget is at {ytd_pct}% YTD utilization with a health score of {health_score}/100. {critical_depts} departments show elevated spend rates requiring attention.",
             "risk_level": "High" if critical_depts > 2 else "Medium" if ytd_pct > 60 else "Low",
             "savings_potential_m": round(total_spent_ytd * 0.12, 1),
             "recommendations": [
-                {"title": "Preventive Infrastructure Programme", "description": "Shift 30% of reactive road maintenance spend to scheduled inspections to reduce emergency call-outs by an estimated 40%.", "impact_m": round(total_spent_ytd * 0.08, 1), "priority": "High", "dept": "Transport for London"},
-                {"title": "Shared Dispatch Coordination Hub", "description": "Consolidate emergency dispatch coordination between Police, Fire, and Ambulance services to reduce duplicate crew deployments.", "impact_m": round(dispatch_cost * 0.15 / 1000, 1), "priority": "Medium", "dept": "Metropolitan Police Service"},
-                {"title": "Smart Utilities Monitoring", "description": "Deploy IoT leak detection sensors at 50 high-risk junctions to reduce emergency water main repairs by 25%.", "impact_m": round(total_spent_ytd * 0.05, 1), "priority": "Medium", "dept": "Thames Water"},
+                {"title": "Preventive PWD Infrastructure Programme", "description": "Shift 30% of reactive road maintenance budget to scheduled inspections to reduce emergency call-outs by 40%.", "impact_m": round(total_spent_ytd * 0.08, 1), "priority": "High", "dept": "Public Works Department (PWD)"},
+                {"title": "Shared Emergency Services Dispatch Hub", "description": "Consolidate dispatch coordination between Police, Fire, and Ambulance services to reduce duplicate team deployments.", "impact_m": round(dispatch_cost * 0.15 / 100, 1), "priority": "Medium", "dept": "City Police & Law Enforcement"},
+                {"title": "Smart Water Leakage Monitoring", "description": "Deploy IoT leak detection sensors at 50 high-risk junctions to reduce emergency water line repairs by 25%.", "impact_m": round(total_spent_ytd * 0.05, 1), "priority": "Medium", "dept": "Water Board & Power Corporation"},
             ],
-            "forecast_alert": f"At current spend velocity, total incident response budget will exceed {round(ytd_pct + 8)}% of annual allocation by Q3. Proactive intervention recommended."
+            "forecast_alert": f"At current spend velocity, total incident response budget will exceed {round(ytd_pct + 8)}% of annual allocation by Q3. Proactive PWD intervention recommended."
         }
 
     return {

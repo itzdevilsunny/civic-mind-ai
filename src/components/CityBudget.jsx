@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import {
-  PoundSterling, TrendingUp, TrendingDown, AlertTriangle,
+  IndianRupee, TrendingUp, TrendingDown, AlertTriangle,
   Zap, Building2, BarChart3, Lightbulb, RefreshCw, ShieldCheck, Activity
 } from 'lucide-react';
 
@@ -74,7 +74,7 @@ function DeptBar({ dept, animateIn }) {
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1 min-w-0 pr-2">
           <h5 className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">{dept.name}</h5>
-          <span className="text-[10px] text-slate-400">&#163;{dept.annual_budget_m.toLocaleString()}M annual</span>
+          <span className="text-[10px] text-slate-400">₹{dept.annual_budget_m.toLocaleString()} Cr annual</span>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <span className={'text-[9px] font-bold px-1.5 py-0.5 rounded-full ' + bgClass} style={{ color }}>
@@ -90,7 +90,7 @@ function DeptBar({ dept, animateIn }) {
       <div className="flex justify-between mt-1.5 text-[9px] text-slate-400">
         <span>{dept.tickets} tickets</span>
         <span>{dept.efficiency_pct}% resolved</span>
-        <span>&#163;{dept.current_spend_k.toLocaleString()}K spent</span>
+        <span>₹{dept.current_spend_k.toLocaleString()} Lakhs spent</span>
       </div>
     </div>
   );
@@ -154,7 +154,7 @@ export default function CityBudget() {
       backgroundColor: 'transparent',
       tooltip: {
         trigger: 'axis',
-        formatter: function(p) { return p[0].axisValue + '<br/>&#163;' + p[0].value.toLocaleString() + 'K'; }
+        formatter: function(p) { return p[0].axisValue + '<br/>₹' + p[0].value.toLocaleString() + ' Lakhs'; }
       },
       grid: { left: '3%', right: '3%', top: '15%', bottom: '10%', containLabel: true },
       xAxis: {
@@ -164,7 +164,7 @@ export default function CityBudget() {
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: '#94a3b8', fontSize: 10, formatter: function(v) { return '&#163;' + (v / 1000).toFixed(0) + 'M'; } },
+        axisLabel: { color: '#94a3b8', fontSize: 10, formatter: function(v) { return '₹' + (v / 100).toFixed(0) + ' Cr'; } },
         splitLine: { lineStyle: { color: '#1e293b33' } },
         axisLine: { show: false }
       },
@@ -191,7 +191,7 @@ export default function CityBudget() {
     const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
     return {
       backgroundColor: 'transparent',
-      tooltip: { trigger: 'item', formatter: '{b}<br/>&#163;{c}K ({d}%)' },
+      tooltip: { trigger: 'item', formatter: '{b}<br/>₹{c} Lakhs ({d}%)' },
       legend: { orient: 'vertical', right: '2%', top: 'center', textStyle: { color: '#94a3b8', fontSize: 10 }, icon: 'circle', itemWidth: 8 },
       series: [{
         type: 'pie',
@@ -230,7 +230,7 @@ export default function CityBudget() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black text-slate-800 dark:text-slate-200 flex items-center gap-2">
-            <PoundSterling className="w-5 h-5 text-indigo-500" />
+            <IndianRupee className="w-5 h-5 text-indigo-500" />
             City Budget &amp; Financial Intelligence
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">Live financial analytics powered by civic incident data</p>
@@ -247,18 +247,18 @@ export default function CityBudget() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={PoundSterling} label="Annual Budget"
-          value={'&#163;' + ((data ? data.total_annual_budget_m : 0) / 1000).toFixed(1) + 'B'}
+        <StatCard icon={IndianRupee} label="Annual Budget"
+          value={'₹' + (data ? data.total_annual_budget_m : 0).toLocaleString('en-IN') + ' Cr'}
           sub="Total allocation 2026" color="#6366f1" />
         <StatCard icon={BarChart3} label="YTD Spent"
-          value={'&#163;' + (data ? data.total_spent_ytd_m : 0).toFixed(1) + 'M'}
+          value={'₹' + (data ? data.total_spent_ytd_m : 0).toFixed(1) + ' Cr'}
           sub={(data ? data.ytd_percentage : 0) + '% of annual budget'} color="#0ea5e9"
           trend={(data && data.ytd_percentage > 55) ? 4.2 : -1.8} />
         <StatCard icon={Activity} label="Incident Cost"
-          value={'&#163;' + (data ? data.total_incident_cost_k : 0).toLocaleString() + 'K'}
+          value={'₹' + (data ? data.total_incident_cost_k : 0).toLocaleString('en-IN') + ' Lakhs'}
           sub={depts.length + ' departments active'} color="#f59e0b" />
         <StatCard icon={Zap} label="Dispatch Cost"
-          value={'&#163;' + (data ? data.total_dispatch_cost_k : 0).toLocaleString() + 'K'}
+          value={'₹' + (data ? data.total_dispatch_cost_k : 0).toLocaleString('en-IN') + ' Lakhs'}
           sub="Emergency response total" color="#8b5cf6" />
       </div>
 
@@ -284,7 +284,7 @@ export default function CityBudget() {
                 Potential Savings Identified
               </span>
               <span className="text-lg font-black text-emerald-700 dark:text-emerald-400">
-                &#163;{ai.savings_potential_m}M
+                ₹{ai.savings_potential_m} Cr
               </span>
             </div>
           )}
@@ -335,7 +335,7 @@ export default function CityBudget() {
                 <span className="text-slate-500 truncate">{c.category}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-slate-400">{c.tickets} tickets</span>
-                  <span className="font-bold text-slate-700 dark:text-slate-300">&#163;{c.cost_k}K</span>
+                  <span className="font-bold text-slate-700 dark:text-slate-300">₹{c.cost_k} Lakhs</span>
                 </div>
               </div>
             ))}
@@ -372,7 +372,7 @@ export default function CityBudget() {
                 <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
                   <span className="text-[10px] text-slate-400">{rec.dept}</span>
                   <span className="text-xs font-black text-emerald-600 dark:text-emerald-400">
-                    Save &#163;{rec.impact_m}M
+                    Save ₹{rec.impact_m} Cr
                   </span>
                 </div>
               </div>
