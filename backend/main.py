@@ -3535,6 +3535,101 @@ Provide exactly 3 operational actions. Only return JSON. No markdown wrappers.""
         ]
     }
 
+# ─────────────────────────────────────────────────────────
+# FEATURE 15: SMART WATER WATCH & RESERVOIR ANALYTICS
+# ─────────────────────────────────────────────────────────
+
+@app.get("/api/water/telemetry")
+def get_water_telemetry(lat: float = 19.076, lng: float = 72.8777):
+    """
+    Fetch live weather precipitation to compute reservoir dynamics.
+    """
+    weather = get_live_weather(lat, lng)
+    precip = weather.get("current", {}).get("precipitation", 0.0)
+    
+    # Simulating 3 city reservoir lakes
+    lakes = [
+        {"name": "Lake Vihar (North)", "capacity_mld": 27000, "level_pct": round(72.4 + precip * 0.5, 1), "inflow_mld": round(120 + precip * 15, 1), "outflow_mld": 110.0},
+        {"name": "Bhatsa Dam (East)", "capacity_mld": 150000, "level_pct": round(64.1 + precip * 0.2, 1), "inflow_mld": round(450 + precip * 60, 1), "outflow_mld": 480.0},
+        {"name": "Tulsi Reservoir (Central)", "capacity_mld": 8000, "level_pct": round(81.9 + precip * 0.9, 1), "inflow_mld": round(45 + precip * 8, 1), "outflow_mld": 40.0}
+    ]
+    
+    total_capacity = sum(l["capacity_mld"] for l in lakes)
+    total_stored = sum(l["capacity_mld"] * (l["level_pct"] / 100.0) for l in lakes)
+    avg_level_pct = round((total_stored / total_capacity) * 100, 1)
+
+    return {
+        "lakes": lakes,
+        "avg_level_pct": avg_level_pct,
+        "total_demand_mld": 3850.0,
+        "total_supply_mld": 3420.0,
+        "deficit_mld": 430.0,
+        "leakage_pct": 18.2,
+        "precipitation_mm": precip
+    }
+
+@app.get("/api/water/rationing-advice")
+def get_water_rationing_advice(city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
+    """
+    Invokes Gemini to analyze water storage levels and generate municipal rationing advisories.
+    """
+    water = get_water_telemetry(lat, lng)
+    avg_level = water.get("avg_level_pct", 70)
+    deficit = water.get("deficit_mld", 400)
+    leakage = water.get("leakage_pct", 18)
+    precip = water.get("precipitation_mm", 0.0)
+
+    prompt = f"""You are the Water Resources Commissioner for {city}, India. Analyze these water supply metrics:
+- Average Reservoir Level: {avg_level}%
+- Daily Water Deficit: {deficit} MLD (Million Litres/Day)
+- Infrastructure Leakage Rate: {leakage}%
+- Live Precipitation: {precip} mm
+
+Provide municipal water management and rationing guidelines as JSON with this exact structure:
+{{
+  "rationing_limit_lpcd": <number, target household consumption limit in Litres Per Capita per Day, e.g. 100-135 LPCD>,
+  "pressure_reduction_pct": <number, target municipal valve pressure reduction e.g. 5-30%>,
+  "tanker_price_cap_inr": <number, regulated price cap in Rupees for private water tankers, e.g. 1000-1500 INR>,
+  "advisory": "2-sentence public conservation advisory",
+  "actions": [
+    {{"title": "Water Security Action", "action": "detailed instruction", "category": "Rationing|Infrastructure|Distribution", "priority": "High|Medium|Low"}}
+  ]
+}}
+Provide exactly 3 operational actions. Only return JSON. No markdown wrappers."""
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("generative-model" if "generative-model" in str(genai.list_models) else "gemini-2.5-flash")
+            # fallback if model names are strict
+            if "gemini-2.5-flash" not in [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]:
+                model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            return json.loads(raw.strip())
+        except Exception as e:
+            logger.warning(f"/api/water/rationing-advice Gemini error (using fallback): {e}")
+
+    # Fallback response
+    rationing = 115 if avg_level < 60 else 135
+    price_cap = 1200 if avg_level < 65 else 1000
+    pressure_red = 20 if avg_level < 60 else 10
+    
+    return {
+        "rationing_limit_lpcd": rationing,
+        "pressure_reduction_pct": pressure_red,
+        "tanker_price_cap_inr": price_cap,
+        "advisory": f"Average reservoir storage is at {avg_level}% for {city}. Water conservation measures are active with valve pressure reduced during non-peak hours.",
+        "actions": [
+            {"title": "Smart Pressure Regulation", "action": "Reduce grid flow pressure by 15% between 13:00 - 16:00 to reduce pipe stress and prevent passive leaks.", "category": "Infrastructure", "priority": "High"},
+            {"title": "Tanker Price Regulation", "action": f"Deploy municipal inspectors to enforce private tanker price caps of ₹{price_cap} per 5,000L.", "category": "Distribution", "priority": "Medium"},
+            {"title": "Rainwater Harvesting Mandate", "action": "Accelerate compliance audits for rainwater harvesting wells in large residential societies.", "category": "Rationing", "priority": "Low"}
+        ]
+    }
+
 @app.get("/api/proposals")
 def get_proposals():
     """
