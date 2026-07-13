@@ -41,6 +41,7 @@ import PredictiveMaintenance from './components/PredictiveMaintenance';
 import AgentTimeline from './components/AgentTimeline';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import PublicSafety from './components/PublicSafety';
+import UrjaGrid from './components/UrjaGrid';
 import { CITIES_BY_STATE, getCityByValue } from './config/indianCities';
 import { t } from './config/i18n';
 
@@ -86,6 +87,7 @@ const TABS = [
   { id: 'traffic', icon: Camera, labelKey: 'traffic', adminOnly: false },
   { id: 'weather', icon: CloudSun, labelKey: 'weather', adminOnly: false },
   { id: 'safety', icon: ShieldAlert, labelKey: 'safety', adminOnly: false },
+  { id: 'urjagrid', icon: Sun, labelKey: 'urjagrid', adminOnly: false },
   { id: 'news', icon: FileText, labelKey: 'news', adminOnly: false },
   { id: 'others', icon: Users, labelKey: 'others', adminOnly: false },
   { id: 'pulse', icon: HeartPulse, labelKey: 'pulse', adminOnly: false },
@@ -176,7 +178,7 @@ export default function App() {
   };
 
   // Tab order for Back/Next navigation
-  const TAB_ORDER = ['overview','transportations','traffic','weather','safety','news','others','pulse','budget','proposals','maintenance','agentlog'];
+  const TAB_ORDER = ['overview','transportations','traffic','weather','safety','urjagrid','news','others','pulse','budget','proposals','maintenance','agentlog'];
   const currentTabIdx = TAB_ORDER.indexOf(activeTab);
   const goBack = () => { if (currentTabIdx > 0) setActiveTab(TAB_ORDER[currentTabIdx - 1]); };
   const goNext = () => { if (currentTabIdx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[currentTabIdx + 1]); };
@@ -1691,6 +1693,15 @@ export default function App() {
               liveWeather={liveWeather}
               liveAqi={liveAqi}
               tickets={tickets}
+            />
+          )}
+
+          {/* TAB 6: URJA GRID */}
+          {activeTab === 'urjagrid' && (
+            <UrjaGrid
+              isDarkMode={isDarkMode}
+              cityInfo={cityInfo}
+              liveAqi={liveAqi}
             />
           )}
 

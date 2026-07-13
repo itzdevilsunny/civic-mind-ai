@@ -163,9 +163,9 @@ def init_db():
         cursor.execute("SELECT COUNT(*) FROM proposals")
         if cursor.fetchone()[0] == 0:
             proposals_seed = [
-                ('PROP-001', 'Smart Solar Lighting on Lambeth Walkways', 'Utilities & Lighting', 'Install motion-sensor LED solar streetlights along Lambeth Senior Care Center paths to reduce grid dependence and increase pedestrian safety.', 'Lambeth', 18, 92, 14000, 'Favorable', 'This proposal matches Lambeth green utility initiatives and will yield cost savings within 18 months.', 'Approved for Pilot'),
-                ('PROP-002', 'Bikeshed & Docks near Westminster Pier', 'Roads & Bridges', 'Expand central Santander docks near Westminster Pier to encourage multi-modal commuting.', 'Westminster', 34, 85, 28000, 'Favorable', 'Highly feasible with strong central demand, aligning with Westminster traffic decongestion models.', 'Approved for Pilot'),
-                ('PROP-003', 'Rooftop Community Composting in Camden', 'Environmental', 'Create community composting heaps on selected residential blocks to reduce organic landfill waste.', 'Camden', 12, 70, 4500, 'Mixed', 'Moderate feasibility. Requires resident compliance and odor control management systems.', 'Passed with Amendment')
+                ('PROP-001', 'Smart Solar Lighting on Sector 3 Walkways', 'Utilities & Lighting', 'Install motion-sensor LED solar streetlights along Sector 3 main walkways to reduce grid dependence and increase pedestrian safety.', 'Sector 3', 18, 92, 14000, 'Favorable', 'This proposal matches regional green utility initiatives and will yield cost savings within 18 months.', 'Approved for Pilot'),
+                ('PROP-002', 'Bikeshed & Sharing Docks near Central Metro Gate', 'Roads & Bridges', 'Expand public cycle sharing docks near Central Metro Gate to encourage multi-modal commuting.', 'Metro Station Zone', 34, 85, 28000, 'Favorable', 'Highly feasible with strong central transit demand, aligning with city traffic decongestion models.', 'Approved for Pilot'),
+                ('PROP-003', 'Rooftop Community Composting in Model Colony', 'Environmental', 'Create community composting heaps on selected residential blocks in Model Colony to reduce organic landfill waste.', 'Model Colony', 12, 70, 4500, 'Mixed', 'Moderate feasibility. Requires resident compliance and odor control management systems.', 'Passed with Amendment')
             ]
             cursor.executemany("INSERT INTO proposals (id, title, category, description, district, upvotes, feasibility, cost_estimate, sentiment, analysis, senate_result) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", proposals_seed)
 
@@ -3438,6 +3438,101 @@ Provide exactly 3 recommendations. Be specific and use real Indian municipal bud
         "monthly_trend": {"months": months, "spend_k": monthly_spend},
         "category_breakdown": category_breakdown,
         "ai_analysis": ai_analysis,
+    }
+
+# ─────────────────────────────────────────────────────────
+# FEATURE 14: SMART ENERGY & SOLAR FEASIBILITY GRID
+# ─────────────────────────────────────────────────────────
+
+@app.get("/api/energy/solar-data")
+def get_solar_data(lat: float = 19.076, lng: float = 72.8777):
+    """
+    Fetch real-time solar radiation and irradiance indices from Open-Meteo.
+    """
+    url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}"
+           f"&current=temperature_2m,cloud_cover,direct_normal_irradiance,global_horizontal_irradiance,diffuse_radiation"
+           f"&daily=shortwave_radiation_sum&timezone=Asia%2FKolkata")
+    try:
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+    except Exception as e:
+        logger.warning(f"Error fetching live solar data: {e}")
+    
+    # Sensible fallback for India solar zones
+    return {
+        "current": {
+            "temperature_2m": 31.2,
+            "cloud_cover": 18,
+            "direct_normal_irradiance": 540.0,
+            "global_horizontal_irradiance": 480.0,
+            "diffuse_radiation": 110.0
+        },
+        "daily": {
+            "time": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            "shortwave_radiation_sum": [22.4, 21.8, 23.5, 24.1, 20.2, 19.8, 22.9]
+        }
+    }
+
+@app.get("/api/energy/grid-optimization")
+def get_grid_optimization(city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
+    """
+    Invokes Gemini to analyze solar irradiance and weather load parameters to output grid advisories.
+    """
+    solar = get_solar_data(lat, lng)
+    weather = get_live_weather(lat, lng)
+    aqi = get_live_aqi(lat, lng)
+    
+    ghi = solar.get("current", {}).get("global_horizontal_irradiance", 450)
+    dni = solar.get("current", {}).get("direct_normal_irradiance", 500)
+    cloud = solar.get("current", {}).get("cloud_cover", 20)
+    temp = weather.get("current", {}).get("temperature_2m", 30)
+    pm25 = aqi.get("current", {}).get("pm2_5", 35)
+
+    prompt = f"""You are a Smart Grid Dispatch Engineer for {city}, India. Analyze these solar and environmental metrics:
+- Global Horizontal Irradiance (GHI): {ghi} W/m²
+- Direct Normal Irradiance (DNI): {dni} W/m²
+- Cloud Cover: {cloud}%
+- Ambient Temperature: {temp}°C
+- Air Quality (PM2.5): {pm25} µg/m³ (soiling factor)
+
+Provide a smart grid load-shaving dispatch instruction as JSON with this exact structure:
+{{
+  "soiling_loss_pct": <number, estimate efficiency loss due to dust/PM2.5, typically 5-25% based on PM2.5>,
+  "peak_shaving_target_mw": <number, target grid reduction, e.g. 15-50MW>,
+  "battery_dispatch_recommendation": "CHARGE|DISCHARGE|STANDBY",
+  "advisory": "2-sentence grid balancing instruction",
+  "actions": [
+    {{"title": "Grid Dispatch Action", "action": "detailed instruction", "category": "Solar/Battery/Consumption", "priority": "High|Medium|Low"}}
+  ]
+}}
+Provide exactly 3 operational actions. Only return JSON. No markdown wrappers."""
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            return json.loads(raw.strip())
+        except Exception as e:
+            logger.warning(f"/api/energy/grid-optimization Gemini error (using fallback): {e}")
+
+    # Fallback response
+    soiling_loss = min(25, max(4, round(pm25 * 0.3)))
+    return {
+        "soiling_loss_pct": soiling_loss,
+        "peak_shaving_target_mw": 28.5,
+        "battery_dispatch_recommendation": "DISCHARGE" if ghi < 150 else "CHARGE",
+        "advisory": f"Solar output is running at standard load for {city}. Recommend battery reserves at 80% to prepare for peak evening demand.",
+        "actions": [
+            {"title": "Evening Peak Shaving", "action": "Instruct battery storage hubs to discharge 24MW into grid at 18:00 IST.", "category": "Battery Dispatch", "priority": "High"},
+            {"title": "Automated Panel Cleaning", "action": "Trigger panel water misting cycles in high soiling zones due to PM2.5 levels.", "category": "Maintenance", "priority": "Medium"},
+            {"title": "Dynamic Grid Pricing", "action": "Activate smart pricing tariffs for industrial consumers to shift load off the 19:00 peak.", "category": "Consumption", "priority": "Low"}
+        ]
     }
 
 @app.get("/api/proposals")
