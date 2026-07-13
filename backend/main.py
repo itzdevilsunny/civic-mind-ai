@@ -3630,6 +3630,110 @@ Provide exactly 3 operational actions. Only return JSON. No markdown wrappers.""
         ]
     }
 
+# ─────────────────────────────────────────────────────────
+# FEATURE 16: SMART HEALTH WATCH & OUTBREAK SURVEILLANCE
+# ─────────────────────────────────────────────────────────
+
+@app.get("/api/health/telemetry")
+def get_health_telemetry(lat: float = 19.076, lng: float = 72.8777):
+    """
+    Fetch live weather and AQI telemetry to compute vector/respiratory disease indexes.
+    """
+    weather = get_live_weather(lat, lng)
+    aqi = get_live_aqi(lat, lng)
+    
+    temp = weather.get("current", {}).get("temperature_2m", 30.0)
+    precip = weather.get("current", {}).get("precipitation", 0.0)
+    pm25 = aqi.get("current", {}).get("pm2_5", 35.0)
+
+    # Calculate seasonal risk scores (0-100)
+    vector_risk = min(100, max(15, round(20 + precip * 12 + (temp - 24) * 2)))
+    respiratory_risk = min(100, max(10, round(15 + pm25 * 0.9)))
+    heat_risk = min(100, max(5, round(temp * 2.2 - 40))) if temp > 30 else 10
+
+    # Simulating 3 city hospitals
+    hospitals = [
+        {"name": "Lokmanya Tilak Municipal Hospital", "beds": 1500, "occupancy_pct": round(84.5 + precip * 0.4, 1), "icu_avail": 8, "wait_time_mins": 35},
+        {"name": "King Edward Memorial Hospital", "beds": 2200, "occupancy_pct": round(89.2 + pm25 * 0.1, 1), "icu_avail": 4, "wait_time_mins": 50},
+        {"name": "Dr. R.N. Cooper Hospital", "beds": 900, "occupancy_pct": 76.5, "icu_avail": 12, "wait_time_mins": 20}
+    ]
+
+    total_beds = sum(h["beds"] for h in hospitals)
+    occupied_beds = sum(h["beds"] * (h["occupancy_pct"] / 100.0) for h in hospitals)
+    avg_occupancy = round((occupied_beds / total_beds) * 100, 1)
+
+    return {
+        "hospitals": hospitals,
+        "avg_occupancy_pct": avg_occupancy,
+        "risks": {
+            "vector_borne": vector_risk,
+            "respiratory": respiratory_risk,
+            "heat_stress": heat_risk
+        },
+        "temperature": temp,
+        "precipitation": precip,
+        "pm25": pm25
+    }
+
+@app.get("/api/health/dispatch-advice")
+def get_health_dispatch_advice(city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
+    """
+    Invokes Gemini to analyze clinic occupancies and seasonal health risks to output dispatch actions.
+    """
+    health = get_health_telemetry(lat, lng)
+    occupancy = health.get("avg_occupancy_pct", 80)
+    risks = health.get("risks", {})
+    temp = health.get("temperature", 30)
+    pm25 = health.get("pm25", 35)
+
+    prompt = f"""You are the Chief Health Officer for {city}, India. Analyze these public health metrics:
+- Average Hospital Bed Occupancy: {occupancy}%
+- Vector-Borne Outbreak Risk: {risks.get('vector_borne', 25)}/100
+- Respiratory Infection Risk: {risks.get('respiratory', 20)}/100
+- Heat Stress Index: {risks.get('heat_stress', 15)}/100
+- PM2.5 Air Pollution: {pm25} µg/m³
+- Temperature: {temp}°C
+
+Provide a smart municipal health emergency response plan as JSON with this exact structure:
+{{
+  "triage_wait_time_mins": <number, average expected outpatient wait time, e.g. 20-60 mins>,
+  "icu_bed_deficit": <number, estimated critical ICU deficit, typically 0-15>,
+  "advisory": "2-sentence public health warning advisory",
+  "actions": [
+    {{"title": "Health Security Action", "action": "detailed instruction", "category": "Sanitation|Medical Stocks|Clinics", "priority": "High|Medium|Low"}}
+  ]
+}}
+Provide exactly 3 operational actions. Only return JSON. No markdown wrappers."""
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("generative-model" if "generative-model" in str(genai.list_models) else "gemini-2.5-flash")
+            if "gemini-2.5-flash" not in [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]:
+                model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            return json.loads(raw.strip())
+        except Exception as e:
+            logger.warning(f"/api/health/dispatch-advice Gemini error (using fallback): {e}")
+
+    # Fallback response
+    wait_time = 45 if occupancy > 85 else 30
+    icu_deficit = 8 if occupancy > 85 else 0
+    return {
+        "triage_wait_time_mins": wait_time,
+        "icu_bed_deficit": icu_deficit,
+        "advisory": f"Seasonal vector-borne risks are elevated at {risks.get('vector_borne', 30)}/100 for {city}. Public clinics are operating under Level 1 alert with anti-larval sprays active.",
+        "actions": [
+            {"title": "Anti-Larval Fumigation", "action": "Mobilize vector control teams to spray stagnant water logging zones near Sector 5 residential pockets.", "category": "Sanitation", "priority": "High"},
+            {"title": "Nebulizer & Oxygen Stocks", "action": f"Pre-position 500 portable nebulizers to clinics in response to PM2.5 levels of {pm25} µg/m³.", "category": "Medical Stocks", "priority": "Medium"},
+            {"title": "ICU Ward Re-routing", "action": "Instruct Cooper Hospital to hold 5 general ICU beds in reserve for emergency transit rerouting.", "category": "Clinics", "priority": "Low"}
+        ]
+    }
+
 @app.get("/api/proposals")
 def get_proposals():
     """
