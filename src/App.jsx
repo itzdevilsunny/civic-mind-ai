@@ -1017,38 +1017,6 @@ export default function App() {
 
       </nav>
 
-      {/* Top bar — user info + language + notifications only (no tab navigation) */}
-      <div className={`top-navbar-container ${isTopNavVisible ? 'visible' : ''}`}>
-        <div className="top-navbar-content">
-          <div className="top-nav-logo">
-            <span>🏙️ CivicMind AI</span>
-          </div>
-          <div className="top-nav-actions" style={{ marginLeft: 'auto' }}>
-            <LanguageSwitcher
-              selectedLang={selectedLang}
-              onLangChange={setSelectedLang}
-              isDarkMode={isDarkMode}
-            />
-            <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-slate-800/40 border border-slate-700/30">
-              <img src={userProfile.avatar} alt={userProfile.name} className="w-5 h-5 rounded-full border border-slate-600" />
-              <div className="hidden lg:flex flex-col items-start leading-none">
-                <span className="text-[10px] font-bold text-white leading-none">{userProfile.name}</span>
-                <span className="text-[8px] text-slate-400 mt-0.5 leading-none">{userProfile.role}</span>
-              </div>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 shadow-md transition-all cursor-pointer"
-              style={{ cursor: 'pointer', border: 'none' }}
-              title="Sign Out"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Sign Out</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* MAIN CONTENT AREA */}
       <main className="main-content">
         {/* HEADER BAR WITH CITY SELECTOR & SEARCH */}
