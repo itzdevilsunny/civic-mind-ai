@@ -92,6 +92,19 @@ const TABS = [
   { id: 'agentlog', icon: Network, labelKey: 'agentlog', adminOnly: true }
 ];
 
+const renderSpelledText = (text, baseDelay = 0) => {
+  if (!text) return '';
+  return text.split('').map((char, idx) => (
+    <span 
+      key={idx} 
+      className="spell-char" 
+      style={{ animationDelay: `${baseDelay + idx * 0.02}s` }}
+    >
+      {char === ' ' ? '\u00A0' : char}
+    </span>
+  ));
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -109,6 +122,37 @@ export default function App() {
   // Sign in/out and Role state
   const [isSignedIn, setIsSignedIn] = useState(() => localStorage.getItem('civicmind_signed_in') === 'true');
   const [userRole, setUserRole] = useState(() => localStorage.getItem('civicmind_user_role') || 'citizen');
+
+  useEffect(() => {
+    if (isSignedIn) return;
+
+    const observerOptions = {
+      root: null,
+      rootMargin: '0px 0px -8% 0px',
+      threshold: 0.02
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          if (entry.target.classList.contains('spell-text')) {
+            observer.unobserve(entry.target);
+          }
+        }
+      });
+    }, observerOptions);
+
+    const timeoutId = setTimeout(() => {
+      const revealElements = document.querySelectorAll('.scroll-reveal, .spell-text');
+      revealElements.forEach(el => observer.observe(el));
+    }, 150);
+
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+    };
+  }, [isSignedIn]);
 
   const handleSignIn = (role) => {
     setUserRole(role);
@@ -743,18 +787,22 @@ export default function App() {
               <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f97316', display: 'inline-block' }} />
               <span style={{ color: '#fb923c', fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Powered by Gemini AI · Live for 100+ Indian Cities</span>
             </div>
-            <h1 style={{ fontSize: 'clamp(2.5rem,6vw,4.5rem)', fontWeight: 900, color: '#ffffff', lineHeight: 1.1, margin: '0 0 24px', letterSpacing: '-0.03em' }}>
-              Smarter Cities Start With<br />
-              <span style={{ background: 'linear-gradient(90deg,#f97316,#fb923c,#fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Decision Intelligence</span>
+            <h1 className="spell-text is-visible" style={{ fontSize: 'clamp(2.5rem,6vw,4.5rem)', fontWeight: 900, color: '#ffffff', lineHeight: 1.1, margin: '0 0 24px', letterSpacing: '-0.03em' }}>
+              {renderSpelledText("Smarter Cities Start With", 0.05)}
+              <br />
+              <span style={{ background: 'linear-gradient(90deg,#f97316,#fb923c,#fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                {renderSpelledText("Decision Intelligence", 0.65)}
+              </span>
+              <span className="spell-cursor" style={{ animation: 'spellBlink 1s step-end infinite, cursorFade 0.5s ease-out 1.5s forwards' }}>|</span>
             </h1>
-            <p style={{ fontSize: '1.2rem', color: '#94a3b8', maxWidth: '680px', margin: '0 auto 40px', lineHeight: 1.7 }}>
+            <p className="scroll-reveal" style={{ fontSize: '1.2rem', color: '#94a3b8', maxWidth: '680px', margin: '0 auto 40px', lineHeight: 1.7, transitionDelay: '0.5s' }}>
               CivicMind AI is India's first multi-agent civic governance platform — bringing real-time environmental data, AI-powered dispatch, citizen participation, and budget transparency into a single command center.
             </p>
-            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '60px' }}>
+            <div className="scroll-reveal" style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '60px', transitionDelay: '0.7s' }}>
               <button onClick={() => handleSignIn('citizen')} onMouseOver={e => e.currentTarget.style.transform='scale(1.04)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'} style={{ cursor: 'pointer', padding: '14px 32px', border: 'none', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 8px 25px rgba(16,185,129,0.35)', transition: 'transform 0.2s' }}>🏘️ Enter as Citizen</button>
               <button onClick={() => handleSignIn('admin')} onMouseOver={e => e.currentTarget.style.transform='scale(1.04)'} onMouseOut={e => e.currentTarget.style.transform='scale(1)'} style={{ cursor: 'pointer', padding: '14px 32px', border: 'none', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'linear-gradient(135deg,#6366f1,#3b82f6)', boxShadow: '0 8px 25px rgba(99,102,241,0.35)', transition: 'transform 0.2s' }}>⚙️ Enter as Administrator</button>
             </div>
-            <div style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(249,115,22,0.2)', maxWidth: '860px', margin: '0 auto' }}>
+            <div className="scroll-reveal" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 40px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(249,115,22,0.2)', maxWidth: '860px', margin: '0 auto', transitionDelay: '0.9s' }}>
               <div style={{ background: '#1e293b', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '6px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b', display: 'inline-block' }} />
@@ -767,10 +815,10 @@ export default function App() {
         </section>
 
         {/* ═══ STATS ═══ */}
-        <section style={{ background: '#ffffff', borderBottom: '1px solid #f1f5f9', padding: '40px 24px' }}>
+        <section className="scroll-reveal" style={{ background: '#ffffff', borderBottom: '1px solid #f1f5f9', padding: '40px 24px' }}>
           <div style={{ maxWidth: '1100px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: '32px', textAlign: 'center' }}>
             {[{ num: '100+', label: 'Indian Cities Supported', icon: '🏙️' },{ num: '11', label: 'AI Agent Modules', icon: '🤖' },{ num: 'Real-Time', label: 'Live Data Feeds', icon: '📡' },{ num: 'Gemini', label: 'AI-Powered Analysis', icon: '✨' },{ num: '2-Role', label: 'Citizen & Admin Access', icon: '🔐' }].map((stat, i) => (
-              <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+              <div key={i} className="scroll-reveal" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', transitionDelay: `${i * 0.08}s` }}>
                 <span style={{ fontSize: '28px' }}>{stat.icon}</span>
                 <span style={{ fontSize: '1.75rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>{stat.num}</span>
                 <span style={{ fontSize: '13px', color: '#64748b', fontWeight: 500 }}>{stat.label}</span>
@@ -780,12 +828,17 @@ export default function App() {
         </section>
 
         {/* ═══ FEATURES DEEP DIVE ═══ */}
-        <section style={{ background: '#f8fafc', padding: '90px 24px' }}>
+        <section className="scroll-reveal" style={{ background: '#f8fafc', padding: '90px 24px' }}>
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: '64px' }}>
               <span style={{ display: 'inline-block', padding: '5px 14px', background: 'rgba(249,115,22,0.1)', color: '#f97316', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '99px', border: '1px solid rgba(249,115,22,0.25)', marginBottom: '16px' }}>Complete Feature Set</span>
-              <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px', letterSpacing: '-0.02em' }}>Everything Your City Needs,<br />In One Platform</h2>
-              <p style={{ fontSize: '1.05rem', color: '#64748b', maxWidth: '600px', margin: '0 auto', lineHeight: 1.7 }}>11 intelligent modules working together — from real-time environmental monitoring to AI-powered governance decisions.</p>
+              <h2 className="spell-text" style={{ fontSize: '2.5rem', fontWeight: 900, color: '#0f172a', margin: '0 0 16px', letterSpacing: '-0.02em' }}>
+                {renderSpelledText("Everything Your City Needs,")}
+                <br />
+                {renderSpelledText("In One Platform")}
+                <span className="spell-cursor" style={{ animation: 'spellBlink 1s step-end infinite, cursorFade 0.5s ease-out 1.2s forwards' }}>|</span>
+              </h2>
+              <p className="scroll-reveal" style={{ fontSize: '1.05rem', color: '#64748b', maxWidth: '600px', margin: '0 auto', lineHeight: 1.7, transitionDelay: '0.15s' }}>11 intelligent modules working together — from real-time environmental monitoring to AI-powered governance decisions.</p>
             </div>
 
             {[
@@ -795,7 +848,7 @@ export default function App() {
               { side: 'left', img: '/ai_dispatch_feature.png', imgAlt: 'AI Dispatch', tag: 'Module 06 · Dispatch & Copilot', tagColor: '#f59e0b', title: 'AI-Powered Dispatch & Field Coordination', desc: 'Administrators get a Gemini-powered Copilot that triages tickets, suggests field officer assignments, and automates routine dispatch decisions — cutting response times by up to 60%.', features: ['Priority-tagged incident queue (Critical/High/Medium/Low)','AI Copilot suggests officer assignments based on skill + proximity','One-click dispatch with automated confirmation messages','Multi-agent coordination log — see all AI decisions in real-time','SLA compliance tracker with escalation alerts'], iconColor: 'linear-gradient(135deg,#f59e0b,#f97316)' },
               { side: 'right', img: '/budget_analytics_feature.png', imgAlt: 'Budget Analytics', tag: 'Module 08 · Budget & Sustainability', tagColor: '#10b981', title: 'City Budget & Sustainability Analytics', desc: 'Full financial transparency for citizens. Track how municipal budgets are allocated, monitor carbon emissions, solar energy output, and compare your city\'s sustainability score against national benchmarks.', features: ['Department-wise budget breakdown: Roads, Healthcare, Education, Water','CO₂ emissions trend vs. net-zero targets','Solar panel output, battery storage & grid feed-in metrics','Ward-level expenditure comparison with equity scoring','AI-generated budget health report with recommendations'], iconColor: 'linear-gradient(135deg,#10b981,#059669)' },
             ].map((feat, fi) => (
-              <div key={fi} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center', marginBottom: fi < 4 ? '100px' : 0 }}>
+              <div key={fi} className="scroll-reveal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '60px', alignItems: 'center', marginBottom: fi < 4 ? '100px' : 0 }}>
                 {feat.side === 'left' && <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.12)', border: '1px solid #e2e8f0' }}><img src={feat.img} alt={feat.imgAlt} style={{ width: '100%', display: 'block' }} /></div>}
                 <div>
                   <span style={{ display: 'inline-block', padding: '4px 12px', background: feat.tagColor + '18', color: feat.tagColor, fontWeight: 700, fontSize: '11px', borderRadius: '6px', marginBottom: '20px', border: `1px solid ${feat.tagColor}30` }}>{feat.tag}</span>
@@ -817,16 +870,19 @@ export default function App() {
         </section>
 
         {/* ═══ ALL 11 MODULES ═══ */}
-        <section style={{ background: '#0f172a', padding: '90px 24px' }}>
+        <section className="scroll-reveal" style={{ background: '#0f172a', padding: '90px 24px' }}>
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: '56px' }}>
               <span style={{ display: 'inline-block', padding: '5px 14px', background: 'rgba(249,115,22,0.15)', color: '#fb923c', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '99px', border: '1px solid rgba(249,115,22,0.3)', marginBottom: '16px' }}>All 11 Intelligence Modules</span>
-              <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#ffffff', margin: '0 0 12px', letterSpacing: '-0.02em' }}>Every Tool You Need to Govern Better</h2>
-              <p style={{ color: '#94a3b8', fontSize: '1rem', maxWidth: '560px', margin: '0 auto' }}>From live data to AI decisions — every module works together in real time.</p>
+              <h2 className="spell-text" style={{ fontSize: '2.2rem', fontWeight: 900, color: '#ffffff', margin: '0 0 12px', letterSpacing: '-0.02em' }}>
+                {renderSpelledText("Every Tool You Need to Govern Better")}
+                <span className="spell-cursor" style={{ animation: 'spellBlink 1s step-end infinite, cursorFade 0.5s ease-out 1.2s forwards' }}>|</span>
+              </h2>
+              <p className="scroll-reveal" style={{ color: '#94a3b8', fontSize: '1rem', maxWidth: '560px', margin: '0 auto', transitionDelay: '0.1s' }}>From live data to AI decisions — every module works together in real time.</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '20px' }}>
               {[{ icon: '🏙️', title: 'City Overview', desc: 'Civic Health Radar, AI Diagnosis, weather station & department KPIs', color: '#6366f1' },{ icon: '🚇', title: 'Live Transportation', desc: 'Metro/bus/bike live status, route maps, dock search & occupancy', color: '#0ea5e9' },{ icon: '🎥', title: 'Traffic & Map', desc: 'Junction camera feeds, congestion heatmaps & AI incident detection', color: '#f59e0b' },{ icon: '🌤️', title: 'Weather & Air Quality', desc: '24hr AQI forecast, PM2.5/PM10 levels, UV index, rainfall alerts', color: '#10b981' },{ icon: '📰', title: 'City News Feed', desc: 'Live news from HT, Dainik Jagaran & local channels per city', color: '#ec4899' },{ icon: '🏛️', title: 'Senate Chamber', desc: 'Citizen proposals, AI-powered voting debates & policy passing', color: '#8b5cf6' },{ icon: '💬', title: 'Sentiment Pulse', desc: 'Social mood radar, district heatmaps & Gemini AI narrative', color: '#a855f7' },{ icon: '💰', title: 'City Budget', desc: 'Department spending, sustainability metrics & CO₂ tracking', color: '#22c55e' },{ icon: '💡', title: 'Proposals', desc: 'Submit, upvote & track community infrastructure proposals', color: '#f97316' },{ icon: '🔧', title: 'Predictive Maintenance', desc: 'AI failure prediction for electrical grids, roads & water mains', color: '#ef4444' },{ icon: '🤖', title: 'Agent Log', desc: 'Full multi-agent communication timeline & AI decision audit trail', color: '#64748b' }].map((mod, i) => (
-                <div key={i} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '22px', transition: 'all 0.2s', cursor: 'default' }} onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = mod.color + '50'; }} onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}>
+                <div key={i} className="scroll-reveal" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '22px', transition: 'background 0.25s, border-color 0.25s, opacity 1.4s cubic-bezier(0.16, 1, 0.3, 1), transform 1.4s cubic-bezier(0.16, 1, 0.3, 1)', transitionDelay: `${(i % 3) * 0.06}s`, cursor: 'default' }} onMouseOver={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)'; e.currentTarget.style.borderColor = mod.color + '50'; }} onMouseOut={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
                     <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: mod.color + '20', border: `1px solid ${mod.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>{mod.icon}</div>
                     <span style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9' }}>{mod.title}</span>
@@ -839,15 +895,18 @@ export default function App() {
         </section>
 
         {/* ═══ ROLES ═══ */}
-        <section style={{ background: '#f8fafc', padding: '90px 24px' }}>
+        <section className="scroll-reveal" style={{ background: '#f8fafc', padding: '90px 24px' }}>
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
             <div style={{ textAlign: 'center', marginBottom: '56px' }}>
               <span style={{ display: 'inline-block', padding: '5px 14px', background: 'rgba(249,115,22,0.1)', color: '#f97316', fontWeight: 700, fontSize: '12px', letterSpacing: '0.08em', textTransform: 'uppercase', borderRadius: '99px', border: '1px solid rgba(249,115,22,0.25)', marginBottom: '16px' }}>Who Is This For?</span>
-              <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px', letterSpacing: '-0.02em' }}>Two Roles, One Platform</h2>
-              <p style={{ color: '#64748b', fontSize: '1rem', maxWidth: '500px', margin: '0 auto' }}>Log in as a Citizen to participate, or as an Admin to govern.</p>
+              <h2 className="spell-text" style={{ fontSize: '2.2rem', fontWeight: 900, color: '#0f172a', margin: '0 0 12px', letterSpacing: '-0.02em' }}>
+                {renderSpelledText("Two Roles, One Platform")}
+                <span className="spell-cursor" style={{ animation: 'spellBlink 1s step-end infinite, cursorFade 0.5s ease-out 1.2s forwards' }}>|</span>
+              </h2>
+              <p className="scroll-reveal" style={{ color: '#64748b', fontSize: '1rem', maxWidth: '500px', margin: '0 auto', transitionDelay: '0.1s' }}>Log in as a Citizen to participate, or as an Admin to govern.</p>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '28px' }}>
-              <div style={{ background: '#ffffff', border: '2px solid #10b981', borderRadius: '20px', padding: '36px', boxShadow: '0 8px 32px rgba(16,185,129,0.08)' }}>
+              <div className="scroll-reveal" style={{ background: '#ffffff', border: '2px solid #10b981', borderRadius: '20px', padding: '36px', boxShadow: '0 8px 32px rgba(16,185,129,0.08)', transitionDelay: '0s' }}>
                 <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#10b981,#059669)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', marginBottom: '20px' }}>🏘️</div>
                 <span style={{ display: 'inline-block', padding: '3px 10px', background: '#d1fae5', color: '#065f46', fontSize: '11px', fontWeight: 700, borderRadius: '6px', marginBottom: '12px' }}>CITIZEN PORTAL</span>
                 <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px' }}>For Every Indian</h3>
@@ -859,7 +918,7 @@ export default function App() {
                 </ul>
                 <button onClick={() => handleSignIn('citizen')} style={{ width: '100%', padding: '12px', border: 'none', borderRadius: '10px', background: 'linear-gradient(135deg,#10b981,#059669)', color: 'white', fontWeight: 800, fontSize: '14px', cursor: 'pointer' }}>🏘️ Enter as Citizen →</button>
               </div>
-              <div style={{ background: '#ffffff', border: '2px solid #6366f1', borderRadius: '20px', padding: '36px', boxShadow: '0 8px 32px rgba(99,102,241,0.08)' }}>
+              <div className="scroll-reveal" style={{ background: '#ffffff', border: '2px solid #6366f1', borderRadius: '20px', padding: '36px', boxShadow: '0 8px 32px rgba(99,102,241,0.08)', transitionDelay: '0.15s' }}>
                 <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'linear-gradient(135deg,#6366f1,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', marginBottom: '20px' }}>⚙️</div>
                 <span style={{ display: 'inline-block', padding: '3px 10px', background: '#e0e7ff', color: '#3730a3', fontSize: '11px', fontWeight: 700, borderRadius: '6px', marginBottom: '12px' }}>ADMIN CONSOLE</span>
                 <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 12px' }}>For Municipal Leaders</h3>
@@ -876,12 +935,15 @@ export default function App() {
         </section>
 
         {/* ═══ CTA ═══ */}
-        <section style={{ background: 'linear-gradient(135deg,#0f172a,#1e1b4b)', padding: '90px 24px', textAlign: 'center' }}>
+        <section className="scroll-reveal" style={{ background: 'linear-gradient(135deg,#0f172a,#1e1b4b)', padding: '90px 24px', textAlign: 'center' }}>
           <div style={{ maxWidth: '680px', margin: '0 auto' }}>
             <div style={{ fontSize: '48px', marginBottom: '20px' }}>🚀</div>
-            <h2 style={{ fontSize: '2.5rem', fontWeight: 900, color: '#ffffff', margin: '0 0 16px', letterSpacing: '-0.02em' }}>Ready to Experience the Future of Civic Governance?</h2>
-            <p style={{ color: '#94a3b8', fontSize: '1.05rem', marginBottom: '40px', lineHeight: 1.7 }}>Join thousands of citizens and administrators making smarter decisions with CivicMind AI — powered by Gemini, built for Bharat.</p>
-            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <h2 className="spell-text" style={{ fontSize: '2.5rem', fontWeight: 900, color: '#ffffff', margin: '0 0 16px', letterSpacing: '-0.02em' }}>
+              {renderSpelledText("Ready to Experience the Future of Civic Governance?")}
+              <span className="spell-cursor" style={{ animation: 'spellBlink 1s step-end infinite, cursorFade 0.5s ease-out 1.8s forwards' }}>|</span>
+            </h2>
+            <p className="scroll-reveal" style={{ color: '#94a3b8', fontSize: '1.05rem', marginBottom: '40px', lineHeight: 1.7, transitionDelay: '0.2s' }}>Join thousands of citizens and administrators making smarter decisions with CivicMind AI — powered by Gemini, built for Bharat.</p>
+            <div className="scroll-reveal" style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', transitionDelay: '0.35s' }}>
               <button onClick={() => handleSignIn('citizen')} style={{ cursor: 'pointer', padding: '14px 36px', border: 'none', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 8px 25px rgba(16,185,129,0.3)' }}>🏘️ Get Started as Citizen</button>
               <button onClick={() => handleSignIn('admin')} style={{ cursor: 'pointer', padding: '14px 36px', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '10px', fontWeight: 800, fontSize: '15px', color: '#fff', background: 'rgba(255,255,255,0.07)' }}>⚙️ Admin Console</button>
             </div>
