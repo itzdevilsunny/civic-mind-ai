@@ -52,6 +52,7 @@ import HealthWatch from './components/HealthWatch';
 import TransitEco from './components/TransitEco';
 import WasteNet from './components/WasteNet';
 import InfraShield from './components/InfraShield';
+import CityCommandCenter from './components/CityCommandCenter';
 import { CITIES_BY_STATE, getCityByValue } from './config/indianCities';
 import { t } from './config/i18n';
 
@@ -1294,196 +1295,24 @@ export default function App() {
 
         <div className="content-body animate-fade-in">
           
-           {/* TAB 1: OVERVIEW */}
+           {/* TAB 1: OVERVIEW — City Command Center */}
           {activeTab === 'overview' && (
-            <div className="flex flex-col gap-6">
-              
-              {/* Civic Health Radar & AI Diagnosis Split Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Radar Chart (2/3 width) */}
-                <div className="card lg:col-span-2">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title">🕸️ Civic Health Radar index</h3>
-                    <span className="card-subtitle">Real-time multi-dimensional city metrics overview</span>
-                  </div>
-                  <div className="h-[220px]">
-                    <ReactECharts option={getCityRadarOption()} style={{ height: '100%', width: '100%' }} />
-                  </div>
-                </div>
-
-                {/* AI Operational Diagnosis card (1/3 width) */}
-                <div className="card flex flex-col justify-between">
-                  <div>
-                    <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                      <h3 className="card-title">🤖 AI Operational Diagnosis</h3>
-                      <span className="card-subtitle">Gemini real-time civic health report</span>
-                    </div>
-                    <p className="text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-medium mt-2">
-                      {getAIDiagnosisSummary()}
-                    </p>
-                  </div>
-                  <div className="mt-4 p-3 bg-indigo-50/10 border border-indigo-150/10 rounded-xl flex justify-between items-center text-[10px] font-mono text-indigo-650">
-                    <span>COORDINATOR: ACTIVE</span>
-                    <span>DIAGNOSIS CONFIDENCE: 94%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Weather Station Summary Card */}
-              <div className="card">
-                <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                  <h3 className="card-title"><CloudSun className="w-5 h-5 text-sky-500" /> Weather Station ({cityInfo?.label || 'City'} Central)</h3>
-                  <span className="card-subtitle">Live meteorological readings from the Open-Meteo network</span>
-                </div>
-                {liveWeather ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Temperature</div>
-                      <div className="text-xl font-bold font-mono text-indigo-650">{liveWeather.current.temperature_2m}°C</div>
-                      <div className="text-[9px] text-slate-450">Apparent: {liveWeather.current.apparent_temperature}°C</div>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Wind Speed</div>
-                      <div className="text-xl font-bold font-mono text-emerald-600">{liveWeather.current.wind_speed_10m} km/h</div>
-                      <div className="text-[9px] text-slate-450">Direction: {liveWeather.current.wind_direction_10m}°</div>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Humidity</div>
-                      <div className="text-xl font-bold font-mono text-amber-500">{liveWeather.current.relative_humidity_2m}%</div>
-                      <div className="text-[9px] text-slate-450">Precipitation: {liveWeather.current.precipitation} mm</div>
-                    </div>
-                    <div className="bg-slate-50 dark:bg-slate-850 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                      <div className="text-[10px] text-slate-500 font-semibold mb-1">Air Quality (AQI)</div>
-                      <div className="text-xl font-bold font-mono text-rose-500">{liveAqi?.current?.pm2_5 || 12} µg/m³</div>
-                      <div className="text-[9px] text-slate-450">PM10: {liveAqi?.current?.pm10 || 18} µg/m³</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs text-slate-400">Loading Live Open-Meteo telemetry...</div>
-                )}
-              </div>
-
-              {/* Map & Transport Split Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 min-h-[400px]">
-                  <DigitalTwin 
-                    nodesList={telemetry}
-                    activeTickets={tickets}
-                    bikepointsList={bikepoints.stations || []}
-                    onEmergencyDispatch={loadLiveData}
-                    onSelectNode={(node) => {
-                      if (node.action === 'dispatch') {
-                        setSystemLogs(prev => [`Safety Agent: [Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
-                        confetti({ particleCount: 80, spread: 60 });
-                      } else {
-                        setSystemLogs(prev => [`Traffic Agent: Selected map telemetry: ${node.name}`, ...prev]);
-                      }
-                    }}
-                    activeIncident={activeIncident}
-                  />
-                </div>
-                
-                {/* Transit line status list card */}
-                <div className="card flex flex-col justify-between">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title"><Car className="w-5 h-5 text-indigo-600" /> {cityInfo?.label || 'City'} Transit Network</h3>
-                    <span className="card-subtitle">Real-time status updates from {cityInfo?.label || 'City'} Transit Authority</span>
-                  </div>
-                  
-                  {liveTransport && liveTransport.length > 0 ? (
-                    <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto pr-1">
-                      {liveTransport.map(line => {
-                        const status = line.lineStatuses[0]?.statusSeverityDescription || 'Good Service';
-                        const isGood = status === 'Good Service';
-                        const isWarning = status.includes('Delay') || status.includes('Reduced');
-                        let badgeClass = 'status-good';
-                        if (isWarning) badgeClass = 'status-warning';
-                        else if (!isGood) badgeClass = 'status-danger';
-
-                        const lineColors = {
-                          bakerloo: '#ae6017',
-                          central: '#e32017',
-                          circle: '#ffd300',
-                          district: '#00782a',
-                          hammersmith: '#f15b2e',
-                          jubilee: '#868f98',
-                          metropolitan: '#9b0056',
-                          northern: '#000000',
-                          piccadilly: '#003688',
-                          victoria: '#00a4e4',
-                          waterloo: '#95cdba'
-                        };
-                        const lineColor = lineColors[line.id] || '#475569';
-
-                        return (
-                          <div key={line.id} className="transport-line-item">
-                            <span className="line-badge" style={{ backgroundColor: lineColor }}>{line.name}</span>
-                            <span className={`status-badge ${badgeClass}`}>{status}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {['Central', 'Victoria', 'Northern', 'District', 'Jubilee'].map(line => (
-                        <div key={line} className="transport-line-item">
-                          <span className="font-bold text-xs">{line} Line</span>
-                          <span className="status-badge status-good">Good Service</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Share Market & Attractions Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* FTSE 100 Live card */}
-                <div className="card lg:col-span-2">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center">
-                    <div>
-                      <h3 className="card-title"><TrendingUp className="w-5 h-5 text-indigo-600" /> Share Market — Nifty 50 &amp; Sensex</h3>
-                      <span className="card-subtitle">Live NSE &amp; BSE market data via Yahoo Finance</span>
-                    </div>
-                    {liveMarket && (
-                      <div className="text-right">
-                        <div className="font-bold font-mono text-lg text-indigo-650">{liveMarket.label || 'Nifty 50'}: {liveMarket.price?.toLocaleString('en-IN')}</div>
-                        <div className={`text-[10px] font-bold ${(liveMarket.changePct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          {(liveMarket.changePct || 0) >= 0 ? '▲' : '▼'} {Math.abs(liveMarket.changePct || 0).toFixed(2)}%
-                        </div>
-                        {liveMarket.secondary && (
-                          <div className="text-[10px] text-slate-450 mt-0.5">
-                            {liveMarket.secondary.label}: {liveMarket.secondary.price?.toLocaleString('en-IN')}
-                            <span className={`ml-1 font-bold ${(liveMarket.secondary.changePct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                              {(liveMarket.secondary.changePct || 0) >= 0 ? '▲' : '▼'}{Math.abs(liveMarket.secondary.changePct || 0).toFixed(2)}%
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="h-[200px]">
-                    <ReactECharts option={getMarketChartOption()} style={{ height: '100%', width: '100%' }} />
-                  </div>
-                </div>
-
-                {/* News preview widget */}
-                <div className="card">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title"><FileText className="w-5 h-5 text-blue-600" /> News Feed</h3>
-                    <span className="card-subtitle">Live {cityInfo?.label || 'City'} Local News</span>
-                  </div>
-                  <div className="flex flex-col gap-3 max-h-[200px] overflow-y-auto pr-1">
-                    {liveNews && liveNews.articles && liveNews.articles.slice(0, 3).map((art, idx) => (
-                      <a key={idx} href={art.link} target="_blank" rel="noopener noreferrer" className="p-2 border border-slate-100 dark:border-slate-800 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-850 transition-colors block">
-                        <div className="font-bold text-xs text-slate-850 dark:text-slate-150 line-clamp-1">{art.title}</div>
-                        <div className="text-[10px] text-slate-450 mt-1">{art.pubDate}</div>
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <CityCommandCenter
+              city={cityInfo?.label || 'Mumbai'}
+              lat={cityInfo?.lat || 19.07}
+              lng={cityInfo?.lng || 72.87}
+              liveWeather={liveWeather}
+              liveAqi={liveAqi}
+              liveTransport={liveTransport}
+              liveMarket={liveMarket}
+              liveNews={liveNews}
+              getCityRadarOption={getCityRadarOption}
+              getAIDiagnosisSummary={getAIDiagnosisSummary}
+              getMarketChartOption={getMarketChartOption}
+              cityInfo={cityInfo}
+              isDarkMode={isDarkMode}
+              setActiveTab={setActiveTab}
+            />
           )}
 
           {/* TAB 2: TRANSPORTATIONS */}

@@ -4476,6 +4476,90 @@ Be specific, data-driven, and actionable. Format as numbered bullets with bold h
     return {"city": city, "advice": advice}
 
 
+# ─── CITY COMMAND CENTER: Cross-Domain Live Summary Endpoints ──────────────────
+
+CITY_WATER_BASELINES = {
+    "mumbai": {"storage_pct": 72, "demand_mld": 3800, "treatment_pct": 91},
+    "delhi":  {"storage_pct": 58, "demand_mld": 4200, "treatment_pct": 87},
+    "pune":   {"storage_pct": 81, "demand_mld": 980,  "treatment_pct": 94},
+    "chennai":{"storage_pct": 44, "demand_mld": 1100, "treatment_pct": 88},
+    "bangalore":{"storage_pct": 63,"demand_mld":1600, "treatment_pct": 90},
+    "hyderabad":{"storage_pct":68,"demand_mld":1400,  "treatment_pct": 92},
+    "kolkata":{"storage_pct": 55, "demand_mld": 1500, "treatment_pct": 85},
+    "ahmedabad":{"storage_pct":75,"demand_mld":1200,  "treatment_pct": 93},
+    "surat":  {"storage_pct": 79, "demand_mld": 650,  "treatment_pct": 95},
+    "indore": {"storage_pct": 82, "demand_mld": 480,  "treatment_pct": 96},
+}
+DEFAULT_WATER_LIVE = {"storage_pct": 65, "demand_mld": 1000, "treatment_pct": 90}
+
+@app.get("/api/water/live")
+def get_water_live(city: str = "Mumbai"):
+    import random
+    city_key = city.lower().replace(" ", "")
+    base = CITY_WATER_BASELINES.get(city_key, DEFAULT_WATER_LIVE)
+    return {
+        "city": city,
+        "storage_pct": max(10, min(100, base["storage_pct"] + random.randint(-3, 3))),
+        "demand_mld": base["demand_mld"],
+        "treatment_pct": base["treatment_pct"],
+        "status": "Critical" if base["storage_pct"] < 40 else ("Warning" if base["storage_pct"] < 60 else "Good")
+    }
+
+CITY_HEALTH_BASELINES = {
+    "mumbai":    {"active_outbreaks": 2, "hospitals": 1200, "bed_occupancy_pct": 78},
+    "delhi":     {"active_outbreaks": 3, "hospitals": 1800, "bed_occupancy_pct": 82},
+    "kolkata":   {"active_outbreaks": 2, "hospitals": 900,  "bed_occupancy_pct": 80},
+    "chennai":   {"active_outbreaks": 1, "hospitals": 750,  "bed_occupancy_pct": 74},
+    "bangalore": {"active_outbreaks": 1, "hospitals": 900,  "bed_occupancy_pct": 71},
+    "hyderabad": {"active_outbreaks": 1, "hospitals": 780,  "bed_occupancy_pct": 72},
+    "pune":      {"active_outbreaks": 1, "hospitals": 550,  "bed_occupancy_pct": 69},
+    "ahmedabad": {"active_outbreaks": 0, "hospitals": 680,  "bed_occupancy_pct": 66},
+    "surat":     {"active_outbreaks": 0, "hospitals": 430,  "bed_occupancy_pct": 62},
+    "indore":    {"active_outbreaks": 0, "hospitals": 340,  "bed_occupancy_pct": 61},
+}
+DEFAULT_HEALTH_LIVE = {"active_outbreaks": 1, "hospitals": 500, "bed_occupancy_pct": 70}
+
+@app.get("/api/health/live")
+def get_health_live(city: str = "Mumbai"):
+    import random
+    city_key = city.lower().replace(" ", "")
+    base = CITY_HEALTH_BASELINES.get(city_key, DEFAULT_HEALTH_LIVE)
+    return {
+        "city": city,
+        "active_outbreaks": base["active_outbreaks"],
+        "hospitals": base["hospitals"],
+        "bed_occupancy_pct": base["bed_occupancy_pct"] + random.randint(-2, 2),
+        "status": "Critical" if base["active_outbreaks"] > 2 else ("Warning" if base["active_outbreaks"] > 0 else "Good")
+    }
+
+CITY_SOLAR_BASELINES = {
+    "mumbai":    {"solar_pct": 22, "installed_mw": 480,  "co2_saved_tpd": 920},
+    "delhi":     {"solar_pct": 18, "installed_mw": 380,  "co2_saved_tpd": 740},
+    "bangalore": {"solar_pct": 28, "installed_mw": 620,  "co2_saved_tpd": 1180},
+    "hyderabad": {"solar_pct": 31, "installed_mw": 680,  "co2_saved_tpd": 1320},
+    "chennai":   {"solar_pct": 26, "installed_mw": 550,  "co2_saved_tpd": 1050},
+    "pune":      {"solar_pct": 24, "installed_mw": 420,  "co2_saved_tpd": 820},
+    "ahmedabad": {"solar_pct": 35, "installed_mw": 780,  "co2_saved_tpd": 1520},
+    "surat":     {"solar_pct": 38, "installed_mw": 820,  "co2_saved_tpd": 1640},
+    "indore":    {"solar_pct": 42, "installed_mw": 910,  "co2_saved_tpd": 1780},
+    "kolkata":   {"solar_pct": 14, "installed_mw": 280,  "co2_saved_tpd": 560},
+}
+DEFAULT_SOLAR_LIVE = {"solar_pct": 22, "installed_mw": 400, "co2_saved_tpd": 800}
+
+@app.get("/api/solar/live")
+def get_solar_live(city: str = "Mumbai"):
+    import random
+    city_key = city.lower().replace(" ", "")
+    base = CITY_SOLAR_BASELINES.get(city_key, DEFAULT_SOLAR_LIVE)
+    return {
+        "city": city,
+        "solar_pct": max(5, min(100, base["solar_pct"] + random.randint(-3, 3))),
+        "installed_mw": base["installed_mw"],
+        "co2_saved_tpd": base["co2_saved_tpd"],
+        "status": "Good" if base["solar_pct"] > 30 else ("Warning" if base["solar_pct"] > 15 else "Critical")
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)
