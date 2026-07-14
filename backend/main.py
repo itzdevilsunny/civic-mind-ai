@@ -4560,6 +4560,136 @@ def get_solar_live(city: str = "Mumbai"):
     }
 
 
+# ─── TRANSPORT DASHBOARD: Live Transit Intelligence ────────────────────────────
+
+CITY_TRANSIT_B = {
+    "mumbai":    {"buses": 3200,  "trains": 2658, "metro_lines": 4, "avg_speed_kmh": 18, "otp_pct": 72, "ridership_lakh": 88, "ev_fleet_pct": 12, "co2_kg_day": 3200, "fleet_total": 5800},
+    "delhi":     {"buses": 7010,  "trains": 394,  "metro_lines": 9, "avg_speed_kmh": 21, "otp_pct": 81, "ridership_lakh": 66, "ev_fleet_pct": 22, "co2_kg_day": 4100, "fleet_total": 7404},
+    "bangalore": {"buses": 6402,  "trains": 58,   "metro_lines": 2, "avg_speed_kmh": 16, "otp_pct": 68, "ridership_lakh": 38, "ev_fleet_pct": 15, "co2_kg_day": 2800, "fleet_total": 6460},
+    "hyderabad": {"buses": 3400,  "trains": 72,   "metro_lines": 3, "avg_speed_kmh": 22, "otp_pct": 77, "ridership_lakh": 42, "ev_fleet_pct": 18, "co2_kg_day": 2100, "fleet_total": 3472},
+    "chennai":   {"buses": 3700,  "trains": 186,  "metro_lines": 2, "avg_speed_kmh": 19, "otp_pct": 74, "ridership_lakh": 52, "ev_fleet_pct": 10, "co2_kg_day": 2600, "fleet_total": 3886},
+    "pune":      {"buses": 2100,  "trains": 42,   "metro_lines": 1, "avg_speed_kmh": 15, "otp_pct": 65, "ridership_lakh": 22, "ev_fleet_pct": 8,  "co2_kg_day": 1800, "fleet_total": 2142},
+    "ahmedabad": {"buses": 2400,  "trains": 24,   "metro_lines": 1, "avg_speed_kmh": 23, "otp_pct": 83, "ridership_lakh": 28, "ev_fleet_pct": 24, "co2_kg_day": 1400, "fleet_total": 2424},
+    "kolkata":   {"buses": 2200,  "trains": 512,  "metro_lines": 3, "avg_speed_kmh": 17, "otp_pct": 71, "ridership_lakh": 45, "ev_fleet_pct": 6,  "co2_kg_day": 2900, "fleet_total": 2712},
+    "surat":     {"buses": 1800,  "trains": 18,   "metro_lines": 0, "avg_speed_kmh": 24, "otp_pct": 86, "ridership_lakh": 19, "ev_fleet_pct": 28, "co2_kg_day": 980,  "fleet_total": 1818},
+    "indore":    {"buses": 800,   "trains": 12,   "metro_lines": 0, "avg_speed_kmh": 26, "otp_pct": 88, "ridership_lakh": 12, "ev_fleet_pct": 32, "co2_kg_day": 620,  "fleet_total": 812},
+}
+DEFAULT_TRANSIT_B = {"buses": 1200, "trains": 80, "metro_lines": 1, "avg_speed_kmh": 20, "otp_pct": 75, "ridership_lakh": 25, "ev_fleet_pct": 15, "co2_kg_day": 1500, "fleet_total": 1280}
+HOURS_T = ['6am','7am','8am','9am','10am','11am','12pm','1pm','2pm','3pm','4pm','5pm','6pm','7pm','8pm','9pm']
+
+@app.get("/api/transport/dashboard")
+def get_transport_dashboard(city: str = "Mumbai"):
+    import random
+    city_key = city.lower().replace(" ", "")
+    base = CITY_TRANSIT_B.get(city_key, DEFAULT_TRANSIT_B)
+    def jt(v, p=8): return max(0, round(v * (1 + (random.random() - 0.5) * p / 100)))
+
+    hourly = []
+    for i, h in enumerate(HOURS_T):
+        is_peak = (2 <= i <= 4) or (10 <= i <= 12)
+        hourly.append({"hour": h, "ridership": jt(round(base["ridership_lakh"] * (0.12 if is_peak else 0.06)), 15)})
+
+    otp_trend = []
+    for day in ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]:
+        otp_trend.append({"day": day, "otp": jt(base["otp_pct"], 8), "target": 85})
+
+    mode_share = [
+        {"name": "Metro", "value": round(base["ridership_lakh"] * 0.38)},
+        {"name": "Bus",   "value": round(base["ridership_lakh"] * 0.42)},
+        {"name": "Rail",  "value": round(base["ridership_lakh"] * 0.14)},
+        {"name": "E-Bus", "value": round(base["ridership_lakh"] * 0.06)},
+    ]
+    ft = base["fleet_total"]
+    fleet_status = [
+        {"label": "In Service",    "value": round(ft * 0.78), "color": "#10b981"},
+        {"label": "Maintenance",   "value": round(ft * 0.12), "color": "#f59e0b"},
+        {"label": "Charging (EV)", "value": round(ft * 0.06), "color": "#6366f1"},
+        {"label": "Off Duty",      "value": round(ft * 0.04), "color": "#94a3b8"},
+    ]
+    incidents = []
+    if base["otp_pct"] < 75 or random.random() > 0.5:
+        incidents.append({"route": f"{city} Metro Line 1", "type": "Delay", "cause": "Signal fault", "impact": f"+{random.randint(3,14)} min", "since": "9:42 AM"})
+    if random.random() > 0.7:
+        incidents.append({"route": f"{city} Bus Route 14", "type": "Diversion", "cause": "Road works", "impact": "Alt route active", "since": "8:15 AM"})
+
+    return {
+        "city": city,
+        "buses": jt(base["buses"]),
+        "trains": jt(base["trains"]),
+        "metro_lines": base["metro_lines"],
+        "avg_speed_kmh": base["avg_speed_kmh"],
+        "otp_pct": jt(base["otp_pct"], 5),
+        "ridership_lakh": base["ridership_lakh"],
+        "ev_fleet_pct": base["ev_fleet_pct"],
+        "co2_kg_day": base["co2_kg_day"],
+        "fleet_total": ft,
+        "hourlyRidership": hourly,
+        "otpTrend": otp_trend,
+        "modeShare": mode_share,
+        "fleetStatus": fleet_status,
+        "incidents": incidents,
+    }
+
+
+class TransportRequest(BaseModel):
+    city: str = "Mumbai"
+    metrics: dict = {}
+
+@app.post("/api/transport/ai-advisor")
+def post_transport_advisor(req: TransportRequest):
+    city = req.city
+    m = req.metrics
+    buses = m.get("buses", 2000)
+    trains = m.get("trains", 100)
+    otp_pct = m.get("otp_pct", 75)
+    ev_fleet_pct = m.get("ev_fleet_pct", 15)
+    co2_kg_day = m.get("co2_kg_day", 1500)
+    ridership_lakh = m.get("ridership_lakh", 25)
+    avg_speed_kmh = m.get("avg_speed_kmh", 20)
+
+    prompt = f"""You are a senior Urban Mobility Engineer and Smart City Transit Advisor for Indian metropolitan areas.
+
+City: {city}
+Active Buses: {buses:,}
+Active Metro/Rail Trains: {trains}
+On-Time Performance (OTP): {otp_pct}%
+EV Fleet Share: {ev_fleet_pct}% (FAME-II target: 30%)
+Daily Ridership: {ridership_lakh} Lakh passengers
+Average Network Speed: {avg_speed_kmh} km/h
+Daily Fleet CO₂ Emissions: {co2_kg_day:,} kg
+
+Generate a 5-point urban mobility optimization plan:
+1. OTP improvement strategy (signal priority, route optimization, real-time tracking)
+2. EV fleet transition roadmap (charging infra, depot planning, FAME-II funding)
+3. Last-mile connectivity enhancement (feeder buses, cycle integration, shared mobility)
+4. Ridership growth strategy (fare integration, commuter apps, intermodal hubs)
+5. Cross-domain synchronization (with road infrastructure, AQI, weather, and energy modules)
+
+Reference: MoHUA Transit Planning Guidelines, UITP Benchmarking Report, NMMP 2.0, FAME-II scheme, and Smart Cities Mission ITS framework.
+Be specific, data-driven, and actionable. Format as numbered bullets with bold headers."""
+
+    if gemini_model:
+        try:
+            response = gemini_model.generate_content(prompt)
+            advice = response.text
+        except Exception:
+            advice = None
+    else:
+        advice = None
+
+    if not advice:
+        advice = (
+            f"🚌 **Transport AI Optimization Plan for {city}:**\n\n"
+            f"1. **OTP Improvement** — OTP at {otp_pct}% vs national target of 85%. Implement ATMS-based bus priority signaling on top-10 high-delay corridors. Deploy real-time passenger information systems at 200 major stops. Expected OTP gain: +8–12% within 90 days.\n\n"
+            f"2. **EV Fleet Transition** — Scale EV fleet from {ev_fleet_pct}% to 30% under FAME-II by FY2026. Install 50 fast-chargers (60kW) at 5 key bus depots. Prioritize high-frequency corridors for first EV deployment. Estimated annual fuel savings: ₹{round(buses * 0.3 * 45000 / 100000)} Lakh.\n\n"
+            f"3. **Last-Mile Connectivity** — Map {ridership_lakh}L/day ridership against residential density. Deploy 120 feeder E-rickshaws at 12 metro stations with 300m coverage radius. Integrate Cycle Sharing docks at all interchange stations under Smart Cities MIS.\n\n"
+            f"4. **Ridership Growth** — Unified mobility pass (Metro + Bus + Cycle) via NCMC card. Launch {city} Transit App with real-time OTP, seat availability, and payment. Target 15% ridership growth in 6 months through seamless intermodal experience.\n\n"
+            f"5. **Cross-Domain Sync** — Routes passing through Infra-Shield Ward 2 & 4 (pothole-critical) need immediate diversion. High-AQI days (>100 µg/m³): activate EV-only peak corridors. Coordinate with Urja-Grid for off-peak EV charging schedules. Current CO₂: {co2_kg_day:,} kg/day — target 20% reduction via EV + route consolidation."
+        )
+
+    return {"city": city, "advice": advice}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)

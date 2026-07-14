@@ -53,6 +53,7 @@ import TransitEco from './components/TransitEco';
 import WasteNet from './components/WasteNet';
 import InfraShield from './components/InfraShield';
 import CityCommandCenter from './components/CityCommandCenter';
+import TransportDashboard from './components/TransportDashboard';
 import { CITIES_BY_STATE, getCityByValue } from './config/indianCities';
 import { t } from './config/i18n';
 
@@ -1315,117 +1316,22 @@ export default function App() {
             />
           )}
 
-          {/* TAB 2: TRANSPORTATIONS */}
+          {/* TAB 2: TRANSPORTATIONS — Live Dashboard */}
           {activeTab === 'transportations' && (
-            <div className="flex flex-col gap-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="card bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-150">
-                  <div className="card-header pb-2">
-                    <h4 className="font-bold text-sm text-indigo-800 dark:text-indigo-400">Buses in Service</h4>
-                  </div>
-                  <div className="text-3xl font-bold font-mono text-indigo-700 dark:text-indigo-400 mt-2">
-                    {activeBuses.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-450 mt-4">{cityInfo?.label || 'City'} Bus Network (Live Traffic Adjusted)</div>
-                </div>
-                <div className="card bg-sky-50/50 dark:bg-sky-950/20 border-sky-150">
-                  <div className="card-header pb-2">
-                    <h4 className="font-bold text-sm text-sky-800 dark:text-sky-400">Trains in Service</h4>
-                  </div>
-                  <div className="text-3xl font-bold font-mono text-sky-700 dark:text-sky-400 mt-2">
-                    {activeTrains.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-450 mt-4">{cityInfo?.label || 'City'} Metro &amp; Rail Network (Live Status)</div>
-                </div>
-                <div className="card bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-150">
-                  <div className="card-header pb-2">
-                    <h4 className="font-bold text-sm text-emerald-800 dark:text-emerald-400">Active Bicycles</h4>
-                  </div>
-                  <div className="text-3xl font-bold font-mono text-emerald-700 dark:text-emerald-400 mt-2">
-                    {bikepoints.global.total_bikes.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-slate-450 mt-4">
-                    {cityInfo?.label || 'City'} Cycles: {bikepoints.global?.occupancy_pct || 0}% Docks Occupied
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Tube Status Board */}
-                <div className="card">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title">🚇 {cityInfo?.label || 'City'} Transit Status</h3>
-                    <span className="card-subtitle">Live metro, rail &amp; bus network statuses</span>
-                  </div>
-                  {liveTransport && liveTransport.length > 0 ? (
-                    <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1">
-                      {liveTransport.map(line => {
-                        const status = line.lineStatuses[0]?.statusSeverityDescription || 'Good Service';
-                        const isGood = status === 'Good Service';
-                        const isWarning = status.includes('Delay') || status.includes('Reduced');
-                        let badgeClass = 'status-good';
-                        if (isWarning) badgeClass = 'status-warning';
-                        else if (!isGood) badgeClass = 'status-danger';
-
-                        return (
-                          <div key={line.id} className="transport-line-item">
-                            <span className="font-bold text-xs text-slate-850 dark:text-slate-150">{line.name}</span>
-                            <span className={`status-badge ${badgeClass}`}>{status}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-xs text-slate-400">Loading city transit statuses...</div>
-                  )}
-                </div>
-
-                {/* Santander Cycles Docks Live Feed */}
-                <div className="card">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center flex-wrap gap-2">
-                    <div>
-                      <h3 className="card-title">🚲 {cityInfo?.label || 'City'} Cycle Sharing Hubs</h3>
-                      <span className="card-subtitle">Real-time dock and bike availability</span>
-                    </div>
-                    <input 
-                      type="text" 
-                      placeholder="Filter docks..."
-                      value={bikeSearchQuery}
-                      onChange={(e) => setBikeSearchQuery(e.target.value)}
-                      className="form-input text-xs py-1 px-2 max-w-[150px]"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2.5 max-h-[350px] overflow-y-auto pr-1">
-                    {filteredBikepoints.length > 0 ? (
-                      filteredBikepoints.map(bp => (
-                        <div key={bp.id} className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl flex items-center justify-between gap-3 hover:border-sky-300 dark:hover:border-sky-900/40 transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <span className="font-bold text-xs text-slate-880 dark:text-slate-200 block truncate">{bp.name}</span>
-                            <span className="text-[10px] text-slate-400">Station ID: {bp.id}</span>
-                          </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <span className="text-xs font-black text-sky-600 block">🚲 {bp.bikes} bikes</span>
-                              <span className="text-[10px] text-slate-450">🔓 {bp.empty} spaces</span>
-                            </div>
-                            <div className="relative w-8 h-8 flex-shrink-0 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-850">
-                              <span className="text-[9px] font-bold text-sky-600">{bp.occupancy_pct}%</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-slate-450">
-                        <span className="text-2xl block mb-1">🔍</span>
-                        <p className="text-xs">No matching cycle hubs found in {cityInfo?.label || 'city'}.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <TransportDashboard
+              city={cityInfo?.label || 'Mumbai'}
+              cityInfo={cityInfo}
+              liveTransport={liveTransport}
+              liveWeather={liveWeather}
+              liveAqi={liveAqi}
+              bikepoints={bikepoints}
+              bikeSearchQuery={bikeSearchQuery}
+              setBikeSearchQuery={setBikeSearchQuery}
+              filteredBikepoints={filteredBikepoints}
+              activeBuses={activeBuses}
+              activeTrains={activeTrains}
+              userRole={userRole}
+            />
           )}
 
           {/* TAB 3: TRAFFIC */}
