@@ -4324,6 +4324,158 @@ Be specific, quantified, and actionable. Format as numbered bullet points with b
     return {"city": city, "advice": advice}
 
 
+# ─── INFRA-SHIELD: Predictive Infrastructure Failure & Road Network Intelligence ──
+
+CITY_INFRA_BASELINES = {
+    "mumbai":    {"roads_km": 2000,  "potholes": 11520, "bridges": 284, "avg_road_age": 18, "repair_budget_cr": 2400, "infra_score": 42, "projects": 38, "pwi": 3.8},
+    "delhi":     {"roads_km": 33000, "potholes": 9780,  "bridges": 312, "avg_road_age": 14, "repair_budget_cr": 3200, "infra_score": 48, "projects": 52, "pwi": 4.1},
+    "bangalore": {"roads_km": 12000, "potholes": 7640,  "bridges": 198, "avg_road_age": 11, "repair_budget_cr": 1800, "infra_score": 51, "projects": 31, "pwi": 4.4},
+    "hyderabad": {"roads_km": 7650,  "potholes": 4320,  "bridges": 156, "avg_road_age": 9,  "repair_budget_cr": 1400, "infra_score": 59, "projects": 24, "pwi": 5.1},
+    "chennai":   {"roads_km": 5722,  "potholes": 5810,  "bridges": 179, "avg_road_age": 16, "repair_budget_cr": 1100, "infra_score": 53, "projects": 29, "pwi": 4.6},
+    "pune":      {"roads_km": 2400,  "potholes": 6190,  "bridges": 97,  "avg_road_age": 13, "repair_budget_cr": 900,  "infra_score": 44, "projects": 22, "pwi": 3.9},
+    "ahmedabad": {"roads_km": 4800,  "potholes": 2880,  "bridges": 134, "avg_road_age": 8,  "repair_budget_cr": 1200, "infra_score": 64, "projects": 19, "pwi": 5.5},
+    "surat":     {"roads_km": 3200,  "potholes": 1640,  "bridges": 112, "avg_road_age": 7,  "repair_budget_cr": 800,  "infra_score": 71, "projects": 14, "pwi": 6.2},
+    "indore":    {"roads_km": 1800,  "potholes": 1280,  "bridges": 68,  "avg_road_age": 6,  "repair_budget_cr": 620,  "infra_score": 74, "projects": 11, "pwi": 6.5},
+    "kolkata":   {"roads_km": 2900,  "potholes": 8950,  "bridges": 173, "avg_road_age": 22, "repair_budget_cr": 1600, "infra_score": 38, "projects": 27, "pwi": 3.4},
+}
+DEFAULT_INFRA_B = {"roads_km": 2000, "potholes": 4000, "bridges": 120, "avg_road_age": 12, "repair_budget_cr": 800, "infra_score": 55, "projects": 20, "pwi": 4.8}
+INFRA_WARDS = ["Ward 1 – North", "Ward 2 – South", "Ward 3 – East", "Ward 4 – West", "Ward 5 – Central", "Ward 6 – Suburban", "Ward 7 – Industrial", "Ward 8 – Heritage"]
+BRIDGE_STATUSES_B = ["Excellent", "Good", "Fair", "Poor", "Critical"]
+PROJ_TYPES = ["Road Widening", "Bridge Rehabilitation", "Pothole Repair", "Flyover Construction", "Signal Upgrade", "Drainage + Roads"]
+CONTRACTORS = ["L&T Infrastructure", "Shapoorji Pallonji", "NCC Ltd", "Dilip Buildcon", "KNR Constructions", "IRCON"]
+
+@app.get("/api/infra/telemetry")
+def get_infra_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 72.87):
+    import random
+    city_key = city.lower().replace(" ", "")
+    base = CITY_INFRA_BASELINES.get(city_key, DEFAULT_INFRA_B)
+
+    def jitter(v, pct=10):
+        return round(v * (1 + (random.random() - 0.5) * pct / 100))
+
+    wards = []
+    for i, w in enumerate(INFRA_WARDS):
+        pot = jitter(round(base["potholes"] / 8) + (i % 3) * 120)
+        rc = max(10, min(95, jitter(base["infra_score"] + (i % 4 - 2) * 8)))
+        wards.append({
+            "name": w,
+            "potholes": pot,
+            "road_condition": rc,
+            "last_repaired": f"{random.randint(1,24)} months ago",
+            "repair_priority": "Critical" if pot > 1200 else ("High" if pot > 800 else ("Medium" if pot > 400 else "Low"))
+        })
+
+    bridge_types = ["Overbridge", "Flyover", "ROB", "Viaduct", "Cable-Stay", "Arch Bridge", "PSC Bridge", "Culvert"]
+    bridges_list = []
+    for i, bt in enumerate(bridge_types):
+        score = round(40 + random.random() * 55)
+        si = 0 if score >= 85 else (1 if score >= 70 else (2 if score >= 55 else (3 if score >= 40 else 4)))
+        bridges_list.append({
+            "name": f"{bt} {chr(65+i)}",
+            "year_built": 1988 + i * 4,
+            "health_score": score,
+            "status": BRIDGE_STATUSES_B[si],
+            "last_inspected": f"{random.randint(1,12)} months ago",
+            "load_factor": round(75 + random.random() * 25),
+            "action": "Immediate Closure Risk" if si >= 4 else ("Schedule Retrofit" if si >= 2 else "Routine Monitoring")
+        })
+
+    active_projects = []
+    for i in range(min(6, base["projects"])):
+        active_projects.append({
+            "name": f"{PROJ_TYPES[i % len(PROJ_TYPES)]} – {INFRA_WARDS[i % len(INFRA_WARDS)].split('–')[1].strip()}",
+            "type": PROJ_TYPES[i % len(PROJ_TYPES)],
+            "budget_cr": round((30 + random.random() * 120) * 10) / 10,
+            "spent_pct": round(20 + random.random() * 75),
+            "target_date": f"Q{random.randint(1,4)} FY{random.randint(26,27)}",
+            "status": ["On Track","Delayed","On Track","Expedited","Delayed","On Track"][i],
+            "contractor": CONTRACTORS[i % len(CONTRACTORS)]
+        })
+
+    months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"]
+    monthly_potholes = []
+    for m in months:
+        reported = jitter(round(base["potholes"] / 12))
+        repaired = jitter(round(base["potholes"] / 15))
+        pending = jitter(round(base["potholes"] / 25))
+        monthly_potholes.append({"month": m, "reported": reported, "repaired": repaired, "pending": pending})
+
+    return {
+        "city": city,
+        "roads_km": base["roads_km"],
+        "potholes": base["potholes"],
+        "bridges": base["bridges"],
+        "avg_road_age": base["avg_road_age"],
+        "repair_budget_cr": base["repair_budget_cr"],
+        "infra_score": base["infra_score"],
+        "projects": base["projects"],
+        "pwi": base["pwi"],
+        "wards": wards,
+        "bridges_list": bridges_list,
+        "active_projects": active_projects,
+        "monthly_potholes": monthly_potholes
+    }
+
+
+class InfraRequest(BaseModel):
+    city: str = "Mumbai"
+    metrics: dict = {}
+
+@app.post("/api/infra/ai-advisor")
+def post_infra_advisor(req: InfraRequest):
+    city = req.city
+    m = req.metrics
+    potholes = m.get("potholes", 4000)
+    infra_score = m.get("infra_score", 55)
+    bridges = m.get("bridges", 120)
+    avg_road_age = m.get("avg_road_age", 12)
+    repair_budget_cr = m.get("repair_budget_cr", 800)
+    pwi = m.get("pwi", 4.8)
+
+    critical_bridges = len([b for b in m.get("bridges_list", []) if b.get("status") in ["Poor", "Critical"]])
+
+    prompt = f"""You are a senior Infrastructure Engineer and Smart City Road Network Advisor for Indian municipalities.
+
+City: {city}
+Active Potholes: {potholes}
+Infrastructure Health Score: {infra_score}/100
+Total Bridges: {bridges} ({critical_bridges} in Poor/Critical condition)
+Average Road Age: {avg_road_age} years
+Annual Repair Budget: ₹{repair_budget_cr} Crore
+Pavement Wear Index (PWI): {pwi}/10
+
+Generate a 5-point predictive maintenance and infrastructure rehabilitation plan:
+1. Bridge emergency triage and load restriction plan
+2. Pothole elimination strategy using modern materials
+3. Pavement lifecycle extension using recycling or overlay methods
+4. Budget optimization for maximum road-km impact
+5. Smart monitoring technology deployment (IoT sensors, ROMDAS, drone surveys)
+
+Reference: IRC SP-18 bridge inspection, MoRTH Road Safety guidelines, PMGSY Phase III, and Smart Cities ICCC integration.
+Be specific, data-driven, and actionable. Format as numbered bullets with bold headers."""
+
+    if gemini_model:
+        try:
+            response = gemini_model.generate_content(prompt)
+            advice = response.text
+        except Exception:
+            advice = None
+    else:
+        advice = None
+
+    if not advice:
+        advice = (
+            f"🏗️ **InfraShield AI Directives for {city}:**\n\n"
+            f"1. **Bridge Emergency Triage** — {critical_bridges} bridges are in Poor/Critical condition. Deploy NDT (Non-Destructive Testing) teams within 72 hours and implement load restrictions per IRC SP-18. Schedule retrofitting for Fair-rated bridges within Q2.\n\n"
+            f"2. **Pothole Elimination** — {potholes:,} active potholes represent ₹{round(potholes * 0.0012, 1)}Cr in latent accident liability. Deploy cold-mix rapid-repair units in top 3 wards; use AI routing to resolve 40% within 30 days.\n\n"
+            f"3. **Pavement Lifecycle Extension** — Roads averaging {avg_road_age} years need pavement recycling rather than patching. In-situ cold recycling extends service life by 10–12 years at 30% lower cost than overlay methods.\n\n"
+            f"4. **Budget Optimization** — Reallocate 20% of ₹{repair_budget_cr}Cr from reactive patching to preventive PCI surveys and micro-surfacing. HDM-4 modeling shows 1.8x ROI on preventive vs reactive expenditure.\n\n"
+            f"5. **Smart Monitoring** — Deploy ROMDAS pavement scanners on top-10 freight corridors and integrate readings into ICCC dashboard. Place IoT load sensors on all bridges with PWI>{pwi} for real-time structural fatigue tracking under Smart Cities Mission IT component."
+        )
+
+    return {"city": city, "advice": advice}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)

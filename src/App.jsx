@@ -27,7 +27,8 @@ import {
   Droplets,
   Heart,
   Leaf,
-  Trash2
+  Trash2,
+  HardHat
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -50,6 +51,7 @@ import WaterWatch from './components/WaterWatch';
 import HealthWatch from './components/HealthWatch';
 import TransitEco from './components/TransitEco';
 import WasteNet from './components/WasteNet';
+import InfraShield from './components/InfraShield';
 import { CITIES_BY_STATE, getCityByValue } from './config/indianCities';
 import { t } from './config/i18n';
 
@@ -100,6 +102,7 @@ const TABS = [
   { id: 'healthwatch', icon: Heart, labelKey: 'healthwatch', adminOnly: false },
   { id: 'transiteco', icon: Leaf, labelKey: 'transiteco', adminOnly: false },
   { id: 'wastenet', icon: Trash2, labelKey: 'wastenet', adminOnly: false },
+  { id: 'infrashield', icon: HardHat, labelKey: 'infrashield', adminOnly: false },
   { id: 'news', icon: FileText, labelKey: 'news', adminOnly: false },
   { id: 'others', icon: Users, labelKey: 'others', adminOnly: false },
   { id: 'pulse', icon: HeartPulse, labelKey: 'pulse', adminOnly: false },
@@ -190,7 +193,7 @@ export default function App() {
   };
 
   // Tab order for Back/Next navigation
-  const TAB_ORDER = ['overview','transportations','traffic','weather','safety','urjagrid','waterwatch','healthwatch','transiteco','wastenet','news','others','pulse','budget','proposals','maintenance','agentlog'];
+  const TAB_ORDER = ['overview','transportations','traffic','weather','safety','urjagrid','waterwatch','healthwatch','transiteco','wastenet','infrashield','news','others','pulse','budget','proposals','maintenance','agentlog'];
   const currentTabIdx = TAB_ORDER.indexOf(activeTab);
   const goBack = () => { if (currentTabIdx > 0) setActiveTab(TAB_ORDER[currentTabIdx - 1]); };
   const goNext = () => { if (currentTabIdx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[currentTabIdx + 1]); };
@@ -1857,6 +1860,15 @@ export default function App() {
           {/* TAB 10: WASTE-NET */}
           {activeTab === 'wastenet' && (
             <WasteNet
+              city={cityInfo?.label || 'Mumbai'}
+              lat={cityInfo?.lat || 19.07}
+              lng={cityInfo?.lng || 72.87}
+            />
+          )}
+
+          {/* TAB 11: INFRA-SHIELD */}
+          {activeTab === 'infrashield' && (
+            <InfraShield
               city={cityInfo?.label || 'Mumbai'}
               lat={cityInfo?.lat || 19.07}
               lng={cityInfo?.lng || 72.87}
