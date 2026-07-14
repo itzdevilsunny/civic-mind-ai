@@ -3734,6 +3734,108 @@ Provide exactly 3 operational actions. Only return JSON. No markdown wrappers.""
         ]
     }
 
+# ─────────────────────────────────────────────────────────
+# FEATURE 17: SMART TRANSIT-ECO & EMISSIONS TRACKER
+# ─────────────────────────────────────────────────────────
+
+@app.get("/api/transit/telemetry")
+def get_transit_telemetry(lat: float = 19.076, lng: float = 72.8777):
+    """
+    Fetch live weather and AQI telemetry to compute transit loads and emissions savings.
+    """
+    weather = get_live_weather(lat, lng)
+    aqi = get_live_aqi(lat, lng)
+    
+    precip = weather.get("current", {}).get("precipitation", 0.0)
+    pm25 = aqi.get("current", {}).get("pm2_5", 35.0)
+
+    # Weather impact factor (heavy rain shifts people from bike-sharing/walking to metro/buses)
+    weather_multiplier = 1.0 + (precip * 0.05)
+    
+    transit_lines = [
+        {"name": "Metro Line 1 (East-West)", "passengers": round(380000 * weather_multiplier), "avg_speed_kmh": 38, "frequency_mins": 3.5},
+        {"name": "BEST Corridor 501 (Western Link)", "passengers": round(42000 * weather_multiplier), "avg_speed_kmh": 14 if precip > 2.0 else 18, "frequency_mins": 12.0},
+        {"name": "Suburban Rail (Western Line)", "passengers": round(950000 * (1.0 + precip * 0.01)), "avg_speed_kmh": 42, "frequency_mins": 4.0}
+    ]
+
+    total_riders = sum(l["passengers"] for l in transit_lines)
+    
+    # 0.12 kg CO2 saved per passenger-km compared to private cars
+    co2_saved_tonnes = round(total_riders * 12 * 0.12 * 0.001, 1) # avg trip 12 km
+    
+    congestion_pct = min(100, max(15, round(28 + precip * 8 + (50 - pm25) * 0.1)))
+
+    return {
+        "lines": transit_lines,
+        "total_riders": total_riders,
+        "co2_saved_tonnes": co2_saved_tonnes,
+        "congestion_pct": congestion_pct,
+        "precipitation_mm": precip,
+        "pm25": pm25
+    }
+
+@app.get("/api/transit/optimization-advice")
+def get_transit_optimization_advice(city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
+    """
+    Invokes Gemini to analyze transit congestion and environmental factors to suggest dispatch optimizations.
+    """
+    telemetry = get_transit_telemetry(lat, lng)
+    riders = telemetry.get("total_riders", 1000000)
+    co2 = telemetry.get("co2_saved_tonnes", 1400)
+    congestion = telemetry.get("congestion_pct", 35)
+    pm25 = telemetry.get("pm25", 35)
+    precip = telemetry.get("precipitation_mm", 0.0)
+
+    prompt = f"""You are the Urban Mobility & Transit Commissioner for {city}, India. Analyze these mobility metrics:
+- Total Daily Public Transit Ridership: {riders} commuters
+- Daily Carbon Savings: {co2} tonnes of CO2
+- Road Traffic Congestion Level: {congestion}%
+- PM2.5 Air Pollution: {pm25} µg/m³
+- Current Rainfall: {precip} mm
+
+Provide a smart urban transit scheduling and congestion mitigation directive as JSON with this exact structure:
+{{
+  "frequency_multiplier": <number, metro/bus dispatch frequency multiplier, e.g. 1.10 - 1.40>,
+  "fare_subsidy_pct": <number, temporary green transit fare subsidy percentage, e.g. 10-50%>,
+  "dynamic_lanes_active": <boolean, true if dedicated bus rapid transit lanes should be enforced>,
+  "advisory": "2-sentence transit optimization warning/guideline",
+  "actions": [
+    {{"title": "Mobility Optimization Action", "action": "detailed instruction", "category": "Metro/Bus/Corridors", "priority": "High|Medium|Low"}}
+  ]
+}}
+Provide exactly 3 operational actions. Only return JSON. No markdown wrappers."""
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("generative-model" if "generative-model" in str(genai.list_models) else "gemini-2.5-flash")
+            if "gemini-2.5-flash" not in [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]:
+                model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            return json.loads(raw.strip())
+        except Exception as e:
+            logger.warning(f"/api/transit/optimization-advice Gemini error (using fallback): {e}")
+
+    # Fallback response
+    freq = 1.25 if congestion > 45 else 1.10
+    subsidy = 30 if pm25 > 60 else 15
+    dynamic_lanes = True if congestion > 40 else False
+    return {
+        "frequency_multiplier": freq,
+        "fare_subsidy_pct": subsidy,
+        "dynamic_lanes_active": dynamic_lanes,
+        "advisory": f"Dynamic congestion levels are at {congestion}% for {city} with a public ridership of {riders:,} commuters. Transit operations are optimized to maximize carbon offset and reduce road congestion.",
+        "actions": [
+            {"title": "Peak Hour Metro Ramps", "action": "Instruct Metro Line 1 to reduce headways from 3.5 minutes to 2.8 minutes to capture increased commuter shift.", "category": "Metro", "priority": "High"},
+            {"title": "Dedicated BRTS Lane Enforcement", "action": "Mobilize traffic police to clear and strictly enforce dedicated bus lanes along Western Link.", "category": "Bus", "priority": "Medium"},
+            {"title": "Temporary Fare Subsidy", "action": f"Apply a {subsidy}% digital ticket discount to encourage private vehicle drivers to ride the suburban rail.", "category": "Corridors", "priority": "Low"}
+        ]
+    }
+
 @app.get("/api/proposals")
 def get_proposals():
     """
