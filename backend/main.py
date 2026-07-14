@@ -4195,6 +4195,135 @@ Output ONLY valid JSON array. No markdown, no explanation."""
     return {"assets": assets, "recommendations": ai_recommendations}
 
 
+# ─── WASTE-NET: Smart Waste & Recycling Intelligence ───────────────────────────
+
+CITY_WASTE_BASELINES = {
+    "mumbai":    {"daily_tpd": 9500,  "recycling_pct": 38, "landfill_cap": 78, "diversion_pct": 47, "swm_rank": 18, "vehicles": 3800, "zones_count": 227},
+    "delhi":     {"daily_tpd": 11000, "recycling_pct": 33, "landfill_cap": 89, "diversion_pct": 41, "swm_rank": 24, "vehicles": 4200, "zones_count": 272},
+    "bangalore": {"daily_tpd": 6000,  "recycling_pct": 42, "landfill_cap": 68, "diversion_pct": 52, "swm_rank": 14, "vehicles": 2400, "zones_count": 198},
+    "hyderabad": {"daily_tpd": 5200,  "recycling_pct": 46, "landfill_cap": 60, "diversion_pct": 57, "swm_rank": 10, "vehicles": 2050, "zones_count": 150},
+    "chennai":   {"daily_tpd": 5400,  "recycling_pct": 44, "landfill_cap": 63, "diversion_pct": 55, "swm_rank": 12, "vehicles": 2100, "zones_count": 200},
+    "pune":      {"daily_tpd": 2200,  "recycling_pct": 58, "landfill_cap": 42, "diversion_pct": 69, "swm_rank": 5,  "vehicles": 920,  "zones_count": 128},
+    "ahmedabad": {"daily_tpd": 3000,  "recycling_pct": 51, "landfill_cap": 51, "diversion_pct": 63, "swm_rank": 7,  "vehicles": 1100, "zones_count": 150},
+    "surat":     {"daily_tpd": 1600,  "recycling_pct": 64, "landfill_cap": 34, "diversion_pct": 74, "swm_rank": 2,  "vehicles": 680,  "zones_count": 107},
+    "indore":    {"daily_tpd": 1100,  "recycling_pct": 72, "landfill_cap": 18, "diversion_pct": 81, "swm_rank": 1,  "vehicles": 480,  "zones_count": 85},
+    "kolkata":   {"daily_tpd": 4700,  "recycling_pct": 29, "landfill_cap": 76, "diversion_pct": 38, "swm_rank": 28, "vehicles": 1900, "zones_count": 144},
+}
+DEFAULT_WASTE = {"daily_tpd": 1200, "recycling_pct": 55, "landfill_cap": 45, "diversion_pct": 65, "swm_rank": 8, "vehicles": 500, "zones_count": 90}
+
+ZONE_NAMES = ["Zone A (North)", "Zone B (South)", "Zone C (East)", "Zone D (West)", "Zone E (Central)", "Zone F (Suburban)"]
+WASTE_CATEGORIES = ["Organic/Wet", "Dry Recyclable", "Hazardous", "Construction", "E-Waste", "Inert"]
+MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
+@app.get("/api/waste/telemetry")
+def get_waste_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 72.87):
+    import random, math
+    city_key = city.lower().replace(" ", "")
+    base = CITY_WASTE_BASELINES.get(city_key, DEFAULT_WASTE)
+
+    def jitter(v, pct=8):
+        return round(v * (1 + (random.random() - 0.5) * pct / 100))
+
+    zones = []
+    for i, zone_name in enumerate(ZONE_NAMES):
+        zones.append({
+            "zone": zone_name,
+            "trucks": random.randint(4, 12),
+            "ot_pct": min(100, jitter(base["recycling_pct"] + 20 - i * 2, 5)),
+            "pending_pickups": random.randint(0, 14),
+            "distance_km": round((8 + i * 3.5) * 10) / 10,
+            "emissions_kg": round((base["daily_tpd"] / base["zones_count"]) * 0.04 * 10) / 10
+        })
+
+    cat_pcts = [42, 28, 8, 12, 3, 7]
+    composition = [
+        {"name": WASTE_CATEGORIES[i], "value": max(1, cat_pcts[i] + random.randint(-4, 4))}
+        for i in range(len(WASTE_CATEGORIES))
+    ]
+
+    monthly = []
+    for m in MONTH_LABELS:
+        collected = jitter(base["daily_tpd"] * 30 // 1000)
+        recycled  = jitter(collected * base["recycling_pct"] // 100)
+        diverted  = jitter(collected * base["diversion_pct"] // 100)
+        monthly.append({"month": m, "collected": collected, "recycled": recycled, "diverted": diverted})
+
+    alerts = [
+        {"zone": "Zone C (East)", "severity": "high",   "msg": f"Overflow risk at Transfer Station 7 — {base['landfill_cap']+16}% capacity"},
+        {"zone": "Zone F (Suburban)", "severity": "medium", "msg": "Route delay: 3 vehicles off-schedule by >45 min"},
+        {"zone": "Zone A (North)", "severity": "low",   "msg": f"Recycling compliance below target ({base['recycling_pct']-12}% vs 70% goal)"},
+    ]
+    if base["landfill_cap"] >= 80:
+        alerts.insert(0, {"zone": "Landfill Site", "severity": "high", "msg": f"CRITICAL: Landfill at {base['landfill_cap']}% — activate emergency diversion protocols immediately"})
+
+    return {
+        "city": city,
+        "daily_tpd": base["daily_tpd"],
+        "recycling_pct": base["recycling_pct"],
+        "landfill_cap": base["landfill_cap"],
+        "diversion_pct": base["diversion_pct"],
+        "swm_rank": base["swm_rank"],
+        "vehicles": base["vehicles"],
+        "zones": zones,
+        "composition": composition,
+        "monthly": monthly,
+        "alerts": alerts
+    }
+
+
+class WasteMetrics(BaseModel):
+    city: str = "Mumbai"
+    metrics: dict = {}
+
+@app.post("/api/waste/optimization-advice")
+def post_waste_optimization(req: WasteMetrics):
+    city = req.city
+    m = req.metrics
+    daily_tpd = m.get("daily_tpd", 1200)
+    recycling_pct = m.get("recycling_pct", 55)
+    landfill_cap = m.get("landfill_cap", 50)
+    diversion_pct = m.get("diversion_pct", 60)
+
+    prompt = f"""You are a Smart City Solid Waste Management (SWM) expert for Indian municipalities.
+
+City: {city}
+Daily Waste: {daily_tpd} tonnes/day
+Recycling Rate: {recycling_pct}%
+Landfill Capacity Used: {landfill_cap}%
+Diversion Rate: {diversion_pct}%
+
+Generate 5 actionable waste optimization directives for this city:
+1. Route efficiency improvements
+2. Recycling rate uplift strategies (include specific targets and Indian government schemes)
+3. Landfill capacity management and bio-remediation plan (if critical)
+4. Fleet decarbonization (CNG/EV transition)
+5. Citizen engagement and source segregation program
+
+Cite real Indian SWM policies (Swachh Bharat Mission, SWM Rules 2016, AMRUT 2.0) where applicable.
+Be specific, quantified, and actionable. Format as numbered bullet points with bold headers."""
+
+    if gemini_model:
+        try:
+            response = gemini_model.generate_content(prompt)
+            advice = response.text
+        except Exception as e:
+            advice = None
+    else:
+        advice = None
+
+    if not advice:
+        advice = (
+            f"🗑️ **Waste Optimization Directives for {city}:**\n\n"
+            f"1. **Dynamic Route AI** — Deploy IoT fill-level sensors in 30% of bins to enable predictive route dispatch, reducing fuel consumption by ~18%.\n"
+            f"2. **Recycling Uplift** — Current {recycling_pct}% rate is {'below' if recycling_pct < 60 else 'near'} the SWM Rules 2016 target of 65%+. Launch ward-level segregation drives under Swachh Bharat Mission with door-to-door collection separation.\n"
+            f"3. **Landfill Relief** — At {landfill_cap}% capacity {'(CRITICAL)' if landfill_cap >= 80 else ''}, initiate AMRUT 2.0-funded bioreactor landfill upgrade and bio-mining of legacy waste — target 12% capacity reduction in 90 days.\n"
+            f"4. **Green Fleet** — Phase in CNG/EV collection vehicles for 25% of fleet this fiscal year under FAME-II subsidy; target 40% reduction in fleet CO₂ by FY2027.\n"
+            f"5. **Citizen Engagement** — Gamify source segregation via the CivicMind AI app: reward households achieving >80% dry/wet separation with municipal service credits and public recognition on ward dashboards."
+        )
+
+    return {"city": city, "advice": advice}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)
