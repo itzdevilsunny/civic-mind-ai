@@ -342,6 +342,16 @@ export default function App() {
     description: ''
   });
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
+  
+  // AI Copilot States
+  const [complaintMode, setComplaintMode] = useState('form'); // 'form' | 'ai'
+  const [chatMessages, setChatMessages] = useState([
+    { sender: 'bot', text: 'Hello! I am your AI Civic Assistant. Describe the issue you are experiencing (e.g. location, type of infrastructure damage), and I will file the ticket for you!' }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [draftedTicket, setDraftedTicket] = useState(null);
+  const [timelineActiveStep, setTimelineActiveStep] = useState(-1);
 
   const [systemLogs, setSystemLogs] = useState([
     `Traffic Agent: ${cityInfo?.label || 'City'} Grid monitoring initialized.`,
@@ -555,6 +565,106 @@ export default function App() {
         setSystemLogs(prev => [`[Offline Sandbox] Local ticket ${fallbackTicket.id} registered.`, ...prev]);
         confetti({ particleCount: 80, spread: 60 });
       });
+  };
+
+  const handleCopilotSend = async (e) => {
+    if (e) e.preventDefault();
+    if (!chatInput.trim() || chatLoading) return;
+
+    const userText = chatInput;
+    setChatMessages(prev => [...prev, { sender: 'user', text: userText }]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const res = await fetch('/api/copilot/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: userText })
+      });
+      const parsed = await res.json();
+      setDraftedTicket(parsed);
+      
+      setChatMessages(prev => [
+        ...prev,
+        {
+          sender: 'bot',
+          text: `I have triaged your request and drafted a ticket:\n\n* **Title**: ${parsed.title}\n* **Category**: ${parsed.category}\n* **Priority**: ${parsed.priority}\n\nPlease review the details below to confirm and file the complaint.`
+        }
+      ]);
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [
+        ...prev,
+        { sender: 'bot', text: 'Sorry, I encountered an error triaging your request. Please try writing in more detail or use the manual form.' }
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleFileDraftedTicket = () => {
+    if (!draftedTicket) return;
+    
+    setTimelineActiveStep(0);
+    setChatMessages(prev => [...prev, { sender: 'bot', text: 'Processing ticket details...' }]);
+
+    setTimeout(() => {
+      setTimelineActiveStep(1);
+      const deptMap = {
+        'Roads & Bridges': t('deptRoads', selectedLang),
+        'Utilities & Lighting': t('deptUtilities', selectedLang),
+        'Public Safety': t('deptPolice', selectedLang),
+        'Environmental': t('deptEnv', selectedLang),
+        'Transport': t('deptTransport', selectedLang),
+        'Social Services': t('deptSocial', selectedLang),
+      };
+      const dept = deptMap[draftedTicket.category] || `${cityInfo.label} Civic Authority`;
+      setChatMessages(prev => [...prev, { sender: 'bot', text: `Routing ticket to regional ${dept}...` }]);
+    }, 1500);
+
+    setTimeout(() => {
+      fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draftedTicket)
+      })
+      .then(res => res.json())
+      .then(createdTicket => {
+        setTickets(prev => [createdTicket, ...prev]);
+        setTimelineActiveStep(2);
+        setChatMessages(prev => [
+          ...prev,
+          { sender: 'bot', text: `🎉 Success! Ticket **${createdTicket.id}** has been registered. Field dispatch is routing to PWD.` }
+        ]);
+        setDraftedTicket(null);
+        confetti({ particleCount: 80, spread: 60 });
+        setTimeout(() => setTimelineActiveStep(-1), 3000);
+      })
+      .catch(() => {
+        const fallbackTicket = {
+          id: `CMI-${Math.random().toString(16).slice(2,6).toUpperCase()}`,
+          title: draftedTicket.title,
+          category: draftedTicket.category,
+          priority: draftedTicket.priority,
+          status: 'Submission Received',
+          department: draftedTicket.category,
+          officer: 'Auto-Assigned',
+          submittedAt: new Date().toISOString(),
+          stage: 0,
+          description: draftedTicket.description
+        };
+        setTickets(prev => [fallbackTicket, ...prev]);
+        setTimelineActiveStep(2);
+        setChatMessages(prev => [
+          ...prev,
+          { sender: 'bot', text: `🎉 Success! Ticket **${fallbackTicket.id}** registered locally.` }
+        ]);
+        setDraftedTicket(null);
+        confetti({ particleCount: 80, spread: 60 });
+        setTimeout(() => setTimelineActiveStep(-1), 3000);
+      });
+    }, 3000);
   };
 
   const getForecastChart = () => {
@@ -1815,63 +1925,181 @@ export default function App() {
                     <span className="card-subtitle">Report infrastructure failures directly to regional maintenance engines.</span>
                   </div>
 
-                  <form onSubmit={handleComplaintSubmit} className="flex flex-col gap-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Category</label>
-                        <select 
-                          value={complaintForm.category}
-                          onChange={(e) => setComplaintForm(prev => ({ ...prev, category: e.target.value }))}
-                          className="form-input"
-                        >
-                          <option value="Roads & Bridges">🛣️ Pavement & Structural Damage</option>
-                          <option value="Utilities & Lighting">💡 Utilities & Electrical Grid</option>
-                          <option value="Public Safety">🛡️ Public Safety & Security</option>
-                          <option value="Environmental">🌿 Environmental & Green Spaces</option>
-                          <option value="Transport">🚌 Transport & Traffic</option>
-                          <option value="Social Services">🤝 Social Services & Housing</option>
-                        </select>
+                  <div className="flex bg-slate-100 dark:bg-slate-900 rounded-xl p-1 mb-5 w-fit border border-slate-200 dark:border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setComplaintMode('form')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${complaintMode === 'form' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
+                    >
+                      📋 Manual Form
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setComplaintMode('ai')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${complaintMode === 'ai' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
+                    >
+                      🤖 AI Copilot Chat
+                    </button>
+                  </div>
+
+                  {complaintMode === 'form' ? (
+                    <form onSubmit={handleComplaintSubmit} className="flex flex-col gap-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-500">Category</label>
+                          <select 
+                            value={complaintForm.category}
+                            onChange={(e) => setComplaintForm(prev => ({ ...prev, category: e.target.value }))}
+                            className="form-input"
+                          >
+                            <option value="Roads & Bridges">🛣️ Pavement & Structural Damage</option>
+                            <option value="Utilities & Lighting">💡 Utilities & Electrical Grid</option>
+                            <option value="Public Safety">🛡️ Public Safety & Security</option>
+                            <option value="Environmental">🌿 Environmental & Green Spaces</option>
+                            <option value="Transport">🚌 Transport & Traffic</option>
+                            <option value="Social Services">🤝 Social Services & Housing</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-500">Urgency</label>
+                          <select 
+                            value={complaintForm.priority}
+                            onChange={(e) => setComplaintForm(prev => ({ ...prev, priority: e.target.value }))}
+                            className="form-input"
+                          >
+                            <option value="Low">🟢 Low</option>
+                            <option value="Medium">🔵 Medium</option>
+                            <option value="High">🟠 High</option>
+                            <option value="Critical">🔴 Critical</option>
+                          </select>
+                        </div>
                       </div>
+
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Urgency</label>
-                        <select 
-                          value={complaintForm.priority}
-                          onChange={(e) => setComplaintForm(prev => ({ ...prev, priority: e.target.value }))}
+                        <label className="text-xs font-semibold text-slate-500">Title</label>
+                        <input 
+                          type="text" 
+                          placeholder="Broken water pipe leaking..." 
+                          value={complaintForm.title}
+                          onChange={(e) => setComplaintForm(prev => ({ ...prev, title: e.target.value }))}
                           className="form-input"
-                        >
-                          <option value="Low">🟢 Low</option>
-                          <option value="Medium">🔵 Medium</option>
-                          <option value="High">🟠 High</option>
-                          <option value="Critical">🔴 Critical</option>
-                        </select>
+                        />
                       </div>
-                    </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-500">Title</label>
-                      <input 
-                        type="text" 
-                        placeholder="Broken water pipe leaking..." 
-                        value={complaintForm.title}
-                        onChange={(e) => setComplaintForm(prev => ({ ...prev, title: e.target.value }))}
-                        className="form-input"
-                      />
-                    </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Description</label>
+                        <textarea 
+                          rows="3" 
+                          placeholder="Provide details..."
+                          value={complaintForm.description}
+                          onChange={(e) => setComplaintForm(prev => ({ ...prev, description: e.target.value }))}
+                          className="form-input"
+                          style={{ resize: 'none' }}
+                        />
+                      </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-500">Description</label>
-                      <textarea 
-                        rows="3" 
-                        placeholder="Provide details..."
-                        value={complaintForm.description}
-                        onChange={(e) => setComplaintForm(prev => ({ ...prev, description: e.target.value }))}
-                        className="form-input"
-                        style={{ resize: 'none' }}
-                      />
-                    </div>
+                      <button type="submit" className="btn-3d btn-primary mt-2 w-full">Submit Ticket</button>
+                    </form>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {/* Chat Messages */}
+                      <div className="flex flex-col gap-3 p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-850 max-h-[300px] overflow-y-auto">
+                        {chatMessages.map((msg, idx) => (
+                          <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed ${msg.sender === 'user' ? 'bg-indigo-650 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-850 text-slate-750 dark:text-slate-200 rounded-tl-none border border-slate-200/50 dark:border-slate-800/50'}`}>
+                              {msg.text.split('\n').map((para, pIdx) => (
+                                <p key={pIdx} className={pIdx > 0 ? 'mt-1.5' : ''}>
+                                  {para.startsWith('* ') ? (
+                                    <span className="block pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-indigo-500">
+                                      {para.slice(2)}
+                                    </span>
+                                  ) : para}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div className="flex justify-start">
+                            <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-850 text-slate-400 rounded-tl-none border border-slate-200/50 dark:border-slate-800/50 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-                    <button type="submit" className="btn-3d btn-primary mt-2 w-full">Submit Ticket</button>
-                  </form>
+                      {/* Draft ticket approval */}
+                      {draftedTicket && (
+                        <div className="p-4 rounded-xl border border-emerald-250 dark:border-emerald-900/40 bg-emerald-500/5 flex flex-col gap-3 my-1 animate-pulse">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">📋 Triage Draft Summary</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${draftedTicket.priority === 'Critical' ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{draftedTicket.priority}</span>
+                          </div>
+                          <div className="flex flex-col gap-1.5 text-xs text-slate-705 dark:text-slate-300">
+                            <div><strong>Title:</strong> {draftedTicket.title}</div>
+                            <div><strong>Category:</strong> {draftedTicket.category}</div>
+                            <div><strong>Description:</strong> {draftedTicket.description}</div>
+                          </div>
+                          <div className="flex gap-2 mt-1">
+                            <button type="button" onClick={handleFileDraftedTicket} className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-sm transition-all cursor-pointer">
+                              Yes, File Complaint
+                            </button>
+                            <button type="button" onClick={() => { setDraftedTicket(null); setChatMessages(prev => [...prev, { sender: 'bot', text: 'Triage canceled. Write another issue description to begin.' }]); }} className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Dispatch Triage Timeline */}
+                      {timelineActiveStep >= 0 && (
+                        <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50 text-xs">
+                          <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">📡 Civic Dispatch Pipeline</span>
+                          <div className="flex flex-col gap-3.5 mt-1.5">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                {timelineActiveStep > 0 ? '✓' : '1'}
+                              </div>
+                              <span className={timelineActiveStep === 0 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-450'}>AI Triage Classification</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                {timelineActiveStep > 1 ? '✓' : '2'}
+                              </div>
+                              <span className={timelineActiveStep === 1 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-450'}>Routing to Municipal Board</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 2 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                {timelineActiveStep >= 2 ? '✓' : '3'}
+                              </div>
+                              <span className={timelineActiveStep === 2 ? 'font-bold text-emerald-500' : 'text-slate-450'}>Ticket Registered Successfully</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chat Input Bar */}
+                      <form onSubmit={handleCopilotSend} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          placeholder="Type your issue (e.g. Broken streetlight on Sector 3)..."
+                          disabled={chatLoading || draftedTicket || timelineActiveStep >= 0}
+                          className="form-input flex-1"
+                        />
+                        <button
+                          type="submit"
+                          disabled={chatLoading || draftedTicket || timelineActiveStep >= 0}
+                          className="px-4 py-2 rounded-lg bg-indigo-650 text-white font-bold text-xs hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          Send
+                        </button>
+                      </form>
+                    </div>
+                  )}
                 </div>
 
                 {/* Incident commands - dynamic from urgent tickets */}

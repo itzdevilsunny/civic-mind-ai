@@ -3836,6 +3836,68 @@ Provide exactly 3 operational actions. Only return JSON. No markdown wrappers.""
         ]
     }
 
+class CopilotQuery(BaseModel):
+    text: str
+
+@app.post("/api/copilot/process")
+def process_copilot_complaint(query: CopilotQuery):
+    """
+    Triage and extract ticket attributes from raw citizen text using Gemini AI.
+    """
+    text = query.text
+    prompt = f"""You are the CivicMind AI triage operator. Analyze the citizen complaint description:
+"{text}"
+
+Extract the ticket parameters as JSON:
+{{
+  "title": "Short descriptive title (max 50 chars)",
+  "category": "Roads & Bridges|Utilities & Lighting|Public Safety|Environmental|Transport|Social Services",
+  "priority": "Low|Medium|High|Critical",
+  "description": "Cleaned up detailed summary of the issue"
+}}
+
+Rules:
+- Select Category exactly from the choices.
+- Select Priority based on severity (e.g. active fires/water floods = Critical/High, simple street light out = Medium, gardening = Low).
+- Only return JSON. No markdown backticks or formatting. Just raw JSON."""
+
+    if gemini_available:
+        try:
+            model = genai.GenerativeModel("generative-model" if "generative-model" in str(genai.list_models) else "gemini-2.5-flash")
+            if "gemini-2.5-flash" not in [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]:
+                model = genai.GenerativeModel("gemini-2.5-flash")
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            return json.loads(raw.strip())
+        except Exception as e:
+            logger.warning(f"/api/copilot/process Gemini error (using fallback): {e}")
+
+    # Fallback parsing
+    cat = "Roads & Bridges"
+    pri = "Medium"
+    if "light" in text.lower() or "electric" in text.lower() or "power" in text.lower():
+        cat = "Utilities & Lighting"
+    elif "fire" in text.lower() or "theft" in text.lower() or "police" in text.lower() or "safe" in text.lower():
+        cat = "Public Safety"
+        pri = "High"
+    elif "tree" in text.lower() or "garbage" in text.lower() or "park" in text.lower():
+        cat = "Environmental"
+    elif "bus" in text.lower() or "train" in text.lower() or "traffic" in text.lower() or "road" in text.lower():
+        cat = "Transport"
+        if "flood" in text.lower() or "crater" in text.lower() or "accident" in text.lower():
+            pri = "High"
+    
+    return {
+        "title": text[:45] + "..." if len(text) > 45 else text,
+        "category": cat,
+        "priority": pri,
+        "description": text
+    }
+
 @app.get("/api/proposals")
 def get_proposals():
     """
