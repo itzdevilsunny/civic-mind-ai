@@ -58,41 +58,7 @@ import TransportDashboard from './components/TransportDashboard';
 import { CITIES_BY_STATE, getCityByValue } from './config/indianCities';
 import { t } from './config/i18n';
 
-const initialTickets = [
-  {
-    id: 'CMI-0101',
-    title: 'Pothole on SV Road near Bandra station',
-    category: 'Roads & Bridges',
-    priority: 'Medium',
-    status: 'In Progress',
-    department: 'Roads & Bridges Dept.',
-    officer: 'Rajesh Sharma',
-    submittedAt: 'Jul 06, 2026, 09:30 AM',
-    stage: 3
-  },
-  {
-    id: 'CMI-0102',
-    title: 'Water main leakage near Juhu Beach road',
-    category: 'Utilities & Lighting',
-    priority: 'High',
-    status: 'Resolved',
-    department: 'Power & Water Dept.',
-    officer: 'Priya Nair',
-    submittedAt: 'Jul 05, 2026, 02:15 PM',
-    stage: 4
-  },
-  {
-    id: 'CMI-0103',
-    title: 'Flickering streetlights near Borivali Senior Care Centre',
-    category: 'Utilities & Lighting',
-    priority: 'Critical',
-    status: 'Assigned',
-    department: 'Power & Water Dept.',
-    officer: 'Arjun Menon',
-    submittedAt: 'Jul 06, 2026, 06:45 PM',
-    stage: 2
-  }
-];
+
 
 const TABS = [
   { id: 'overview', icon: Building2, labelKey: 'overview', adminOnly: false },
@@ -255,7 +221,7 @@ export default function App() {
   const [liveTransport, setLiveTransport] = useState([]);
   const [liveMarket, setLiveMarket] = useState(null);
   const [liveNews, setLiveNews] = useState({ channel: '', channel_url: '', articles: [] });
-  const [tickets, setTickets] = useState(initialTickets);
+  const [tickets, setTickets] = useState([]);
   const [telemetry, setTelemetry] = useState([]);
   const [senatePolicy, setSenatePolicy] = useState(null);
   const [actionHistory, setActionHistory] = useState([]);
@@ -2035,266 +2001,222 @@ export default function App() {
           {/* TAB 6: ACTUATORS & ANALYTICS */}
           {activeTab === 'others' && (
             <div className="flex flex-col gap-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 
-                {/* Submit civic complaint */}
-                <div className="card lg:col-span-2">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title"><FileText className="w-5 h-5 text-indigo-650" /> Submit Civic Complaint</h3>
-                    <span className="card-subtitle">Report infrastructure failures directly to regional maintenance engines.</span>
-                  </div>
+                {/* Submit civic complaint (Citizens Only) */}
+                {userRole === 'citizen' && (
+                  <div className="card">
+                    <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+                      <h3 className="card-title"><FileText className="w-5 h-5 text-indigo-650" /> Submit Civic Complaint</h3>
+                      <span className="card-subtitle">Report infrastructure failures directly to regional maintenance engines.</span>
+                    </div>
 
-                  <div className="flex bg-slate-100 dark:bg-slate-900 rounded-xl p-1 mb-5 w-fit border border-slate-200 dark:border-slate-800">
-                    <button
-                      type="button"
-                      onClick={() => setComplaintMode('form')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${complaintMode === 'form' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
-                    >
-                      📋 Manual Form
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setComplaintMode('ai')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${complaintMode === 'ai' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
-                    >
-                      🤖 AI Copilot Chat
-                    </button>
-                  </div>
+                    <div className="flex bg-slate-100 dark:bg-slate-900 rounded-xl p-1 mb-5 w-fit border border-slate-200 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setComplaintMode('form')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${complaintMode === 'form' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
+                      >
+                        📋 Manual Form
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setComplaintMode('ai')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${complaintMode === 'ai' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-sm' : 'text-slate-400'}`}
+                      >
+                        🤖 AI Copilot Chat
+                      </button>
+                    </div>
 
-                  {complaintMode === 'form' ? (
-                    <form onSubmit={handleComplaintSubmit} className="flex flex-col gap-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-slate-500">Category</label>
-                          <select 
-                            value={complaintForm.category}
-                            onChange={(e) => setComplaintForm(prev => ({ ...prev, category: e.target.value }))}
-                            className="form-input"
-                          >
-                            <option value="Roads & Bridges">🛣️ Pavement & Structural Damage</option>
-                            <option value="Utilities & Lighting">💡 Utilities & Electrical Grid</option>
-                            <option value="Public Safety">🛡️ Public Safety & Security</option>
-                            <option value="Environmental">🌿 Environmental & Green Spaces</option>
-                            <option value="Transport">🚌 Transport & Traffic</option>
-                            <option value="Social Services">🤝 Social Services & Housing</option>
-                          </select>
+                    {complaintMode === 'form' ? (
+                      <form onSubmit={handleComplaintSubmit} className="flex flex-col gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-slate-500">Category</label>
+                            <select 
+                              value={complaintForm.category}
+                              onChange={(e) => setComplaintForm(prev => ({ ...prev, category: e.target.value }))}
+                              className="form-input"
+                            >
+                              <option value="Roads & Bridges">🛣️ Pavement & Structural Damage</option>
+                              <option value="Utilities & Lighting">💡 Utilities & Electrical Grid</option>
+                              <option value="Public Safety">🛡️ Public Safety & Hazard Zones</option>
+                              <option value="Environmental">🌳 Garbage & Environmental Sanitation</option>
+                              <option value="Transport">🚌 Public Transit Service Failures</option>
+                              <option value="Social Services">🤝 Municipal Social Service Gaps</option>
+                            </select>
+                          </div>
+
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-slate-500">Priority Level</label>
+                            <select 
+                              value={complaintForm.priority}
+                              onChange={(e) => setComplaintForm(prev => ({ ...prev, priority: e.target.value }))}
+                              className="form-input"
+                            >
+                              <option value="Low">🟢 Low Priority</option>
+                              <option value="Medium">🟡 Medium Priority</option>
+                              <option value="High">🟠 High Priority</option>
+                              <option value="Critical">🔴 Critical (Immediate Threat)</option>
+                            </select>
+                          </div>
                         </div>
+
                         <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-slate-500">Urgency</label>
-                          <select 
-                            value={complaintForm.priority}
-                            onChange={(e) => setComplaintForm(prev => ({ ...prev, priority: e.target.value }))}
+                          <label className="text-xs font-semibold text-slate-500">Issue Title</label>
+                          <input 
+                            type="text"
+                            placeholder="Brief title summarizing the municipal issue..."
+                            value={complaintForm.title}
+                            onChange={(e) => setComplaintForm(prev => ({ ...prev, title: e.target.value }))}
                             className="form-input"
-                          >
-                            <option value="Low">🟢 Low</option>
-                            <option value="Medium">🔵 Medium</option>
-                            <option value="High">🟠 High</option>
-                            <option value="Critical">🔴 Critical</option>
-                          </select>
+                            required
+                          />
                         </div>
-                      </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Title</label>
-                        <input 
-                          type="text" 
-                          placeholder="Broken water pipe leaking..." 
-                          value={complaintForm.title}
-                          onChange={(e) => setComplaintForm(prev => ({ ...prev, title: e.target.value }))}
-                          className="form-input"
-                        />
-                      </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-500">Detailed Description</label>
+                          <textarea 
+                            placeholder="Provide details of the problem (landmarks, danger index, duration)..."
+                            value={complaintForm.description}
+                            onChange={(e) => setComplaintForm(prev => ({ ...prev, description: e.target.value }))}
+                            className="form-input h-24 resize-none"
+                            required
+                          />
+                        </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Description</label>
-                        <textarea 
-                          rows="3" 
-                          placeholder="Provide details..."
-                          value={complaintForm.description}
-                          onChange={(e) => setComplaintForm(prev => ({ ...prev, description: e.target.value }))}
-                          className="form-input"
-                          style={{ resize: 'none' }}
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-                          <span>📸 Attach Live / Upload Image</span>
-                        </label>
-                        <div className="flex items-center gap-3">
-                          <label 
-                            className="flex items-center justify-center gap-2 cursor-pointer border border-dashed border-slate-350 dark:border-slate-800 rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-xs font-bold text-slate-650 dark:text-slate-350 transition-colors w-full"
-                          >
-                            <span>📷 Take Photo / Choose File</span>
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    setComplaintForm(prev => ({ ...prev, image: reader.result }));
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                              className="hidden" 
-                            />
-                          </label>
-                          
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-xs font-semibold text-slate-500">Attach Live Image (Optional)</label>
+                          <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  setComplaintForm(prev => ({ ...prev, image: reader.result }));
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="form-input text-xs" 
+                          />
                           {complaintForm.image && (
-                            <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 flex-shrink-0">
-                              <img src={complaintForm.image} alt="Report preview" className="w-full h-full object-cover" />
+                            <div className="relative mt-2 w-24 h-24 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                              <img src={complaintForm.image} alt="Preview" className="w-full h-full object-cover" />
                               <button 
-                                type="button"
+                                type="button" 
                                 onClick={() => setComplaintForm(prev => ({ ...prev, image: '' }))}
-                                className="absolute top-0.5 right-0.5 bg-black/60 hover:bg-black/80 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"
+                                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-[10px]"
                               >
                                 ✕
                               </button>
                             </div>
                           )}
                         </div>
-                      </div>
 
-                      <button type="submit" className="btn-3d btn-primary mt-2 w-full">Submit Ticket</button>
-                    </form>
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      {/* Chat Messages */}
-                      <div className="flex flex-col gap-3 p-4 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl border border-slate-100 dark:border-slate-850 max-h-[300px] overflow-y-auto">
-                        {chatMessages.map((msg, idx) => (
-                          <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed ${msg.sender === 'user' ? 'bg-indigo-650 text-white rounded-tr-none' : 'bg-slate-100 dark:bg-slate-850 text-slate-750 dark:text-slate-200 rounded-tl-none border border-slate-200/50 dark:border-slate-800/50'}`}>
-                              {msg.text.split('\n').map((para, pIdx) => (
-                                <p key={pIdx} className={pIdx > 0 ? 'mt-1.5' : ''}>
-                                  {para.startsWith('* ') ? (
-                                    <span className="block pl-3 relative before:content-['•'] before:absolute before:left-0 before:text-indigo-500">
-                                      {para.slice(2)}
-                                    </span>
-                                  ) : para}
-                                </p>
-                              ))}
+                        <button type="submit" className="btn btn-primary py-2.5 font-bold text-xs mt-2" style={{ cursor: 'pointer' }}>
+                          Submit Complaint
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="flex flex-col gap-4">
+                        <div className="flex-1 flex flex-col gap-2.5 h-64 overflow-y-auto border border-slate-150 dark:border-slate-850 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl p-3">
+                          {chatMessages.map((msg, idx) => (
+                            <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                                msg.sender === 'user' 
+                                  ? 'bg-indigo-650 text-white rounded-tr-none' 
+                                  : 'bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-slate-800 dark:text-slate-200 rounded-tl-none shadow-sm'
+                              }`}>
+                                {msg.text}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                        {chatLoading && (
-                          <div className="flex justify-start">
-                            <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-850 text-slate-400 rounded-tl-none border border-slate-200/50 dark:border-slate-800/50 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          ))}
+                          {chatLoading && (
+                            <div className="flex justify-start">
+                              <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl rounded-tl-none px-3 py-2 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Draft ticket approval */}
+                        {draftedTicket && (
+                          <div className="p-4 rounded-xl border border-emerald-250 dark:border-emerald-900/40 bg-emerald-500/5 flex flex-col gap-3 my-1 animate-pulse">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">📋 Triage Draft Summary</span>
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${draftedTicket.priority === 'Critical' ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{draftedTicket.priority}</span>
+                            </div>
+                            <div className="flex flex-col gap-1.5 text-xs text-slate-705 dark:text-slate-300">
+                              <div><strong>Title:</strong> {draftedTicket.title}</div>
+                              <div><strong>Category:</strong> {draftedTicket.category}</div>
+                              <div><strong>Description:</strong> {draftedTicket.description}</div>
+                            </div>
+                            <div className="flex gap-2 mt-1">
+                              <button type="button" onClick={handleFileDraftedTicket} className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-sm transition-all cursor-pointer">
+                                Yes, File Complaint
+                              </button>
+                              <button type="button" onClick={() => { setDraftedTicket(null); setChatMessages(prev => [...prev, { sender: 'bot', text: 'Triage canceled. Write another issue description to begin.' }]); }} className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer">
+                                Cancel
+                              </button>
                             </div>
                           </div>
                         )}
-                      </div>
 
-                      {/* Draft ticket approval */}
-                      {draftedTicket && (
-                        <div className="p-4 rounded-xl border border-emerald-250 dark:border-emerald-900/40 bg-emerald-500/5 flex flex-col gap-3 my-1 animate-pulse">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">📋 Triage Draft Summary</span>
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${draftedTicket.priority === 'Critical' ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/20 text-emerald-500'}`}>{draftedTicket.priority}</span>
-                          </div>
-                          <div className="flex flex-col gap-1.5 text-xs text-slate-705 dark:text-slate-300">
-                            <div><strong>Title:</strong> {draftedTicket.title}</div>
-                            <div><strong>Category:</strong> {draftedTicket.category}</div>
-                            <div><strong>Description:</strong> {draftedTicket.description}</div>
-                          </div>
-                          <div className="flex gap-2 mt-1">
-                            <button type="button" onClick={handleFileDraftedTicket} className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-sm transition-all cursor-pointer">
-                              Yes, File Complaint
-                            </button>
-                            <button type="button" onClick={() => { setDraftedTicket(null); setChatMessages(prev => [...prev, { sender: 'bot', text: 'Triage canceled. Write another issue description to begin.' }]); }} className="px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-900 transition-all cursor-pointer">
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Dispatch Triage Timeline */}
-                      {timelineActiveStep >= 0 && (
-                        <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50 text-xs">
-                          <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">📡 Civic Dispatch Pipeline</span>
-                          <div className="flex flex-col gap-3.5 mt-1.5">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                {timelineActiveStep > 0 ? '✓' : '1'}
+                        {/* Dispatch Triage Timeline */}
+                        {timelineActiveStep >= 0 && (
+                          <div className="flex flex-col gap-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50 text-xs">
+                            <span className="font-bold text-[10px] text-slate-400 uppercase tracking-wider">📡 Civic Dispatch Pipeline</span>
+                            <div className="flex flex-col gap-3.5 mt-1.5">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                  {timelineActiveStep > 0 ? '✓' : '1'}
+                                </div>
+                                <span className={timelineActiveStep === 0 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-455'}>AI Triage Classification</span>
                               </div>
-                              <span className={timelineActiveStep === 0 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-450'}>AI Triage Classification</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                {timelineActiveStep > 1 ? '✓' : '2'}
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 1 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                  {timelineActiveStep > 1 ? '✓' : '2'}
+                                </div>
+                                <span className={timelineActiveStep === 1 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-455'}>Routing to Municipal Board</span>
                               </div>
-                              <span className={timelineActiveStep === 1 ? 'font-bold text-slate-800 dark:text-slate-200' : 'text-slate-450'}>Routing to Municipal Board</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 2 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
-                                {timelineActiveStep >= 2 ? '✓' : '3'}
+                              <div className="flex items-center gap-3">
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[10px] ${timelineActiveStep >= 2 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                                  {timelineActiveStep >= 2 ? '✓' : '3'}
+                                </div>
+                                <span className={timelineActiveStep === 2 ? 'font-bold text-emerald-500' : 'text-slate-455'}>Ticket Registered Successfully</span>
                               </div>
-                              <span className={timelineActiveStep === 2 ? 'font-bold text-emerald-500' : 'text-slate-450'}>Ticket Registered Successfully</span>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Chat Input Bar */}
-                      <form onSubmit={handleCopilotSend} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={chatInput}
-                          onChange={e => setChatInput(e.target.value)}
-                          placeholder="Type your issue (e.g. Broken streetlight on Sector 3)..."
-                          disabled={chatLoading || draftedTicket || timelineActiveStep >= 0}
-                          className="form-input flex-1"
-                        />
-                        <button
-                          type="submit"
-                          disabled={chatLoading || draftedTicket || timelineActiveStep >= 0}
-                          className="px-4 py-2 rounded-lg bg-indigo-650 text-white font-bold text-xs hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
-                        >
-                          Send
-                        </button>
-                      </form>
-                    </div>
-                  )}
-                </div>
-
-                {/* Incident commands - dynamic from urgent tickets */}
-                <div className="card">
-                  <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-                    <h3 className="card-title">⚡ Incident Console</h3>
-                    <span className="card-subtitle">High-priority civic alerts requiring action</span>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    {filteredTickets.filter(t => t.priority === 'Critical' || t.priority === 'High').slice(0, 3).length > 0 ? (
-                      filteredTickets.filter(t => t.priority === 'Critical' || t.priority === 'High').slice(0, 3).map(t => (
-                        <div key={t.id} className={`p-3 rounded-xl border ${t.priority === 'Critical' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40' : 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'}`}>
-                          <span className={`text-xs font-bold block mb-1 ${t.priority === 'Critical' ? 'text-rose-800 dark:text-rose-400' : 'text-amber-800 dark:text-amber-400'}`}>
-                            {t.priority === 'Critical' ? '🚨' : '⚠️'} {t.id} — {t.title.slice(0, 38)}{t.title.length > 38 ? '...' : ''}
-                          </span>
-                          <p className="text-[10px] text-slate-500 mb-2">{t.department} · Status: {t.status}</p>
+                        {/* Chat Input Bar */}
+                        <form onSubmit={handleCopilotSend} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={chatInput}
+                            onChange={e => setChatInput(e.target.value)}
+                            placeholder="Type your issue (e.g. Broken streetlight on Sector 3)..."
+                            disabled={chatLoading || draftedTicket || timelineActiveStep >= 0}
+                            className="form-input flex-1"
+                          />
                           <button
-                            onClick={() => executeCopilotAction(`Dispatch emergency response to: ${t.title}`)}
-                            className="btn btn-primary py-1 text-xs w-full"
-                            style={{ backgroundColor: t.priority === 'Critical' ? '#e11d48' : '#d97706' }}
+                            type="submit"
+                            disabled={chatLoading || draftedTicket || timelineActiveStep >= 0}
+                            className="px-4 py-2 rounded-lg bg-indigo-650 text-white font-bold text-xs hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
                           >
-                            🚀 Dispatch Response Unit
+                            Send
                           </button>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-slate-400">
-                        <div className="text-2xl mb-2">✅</div>
-                        <p className="text-xs font-semibold">All clear — no critical incidents</p>
-                        <p className="text-[10px] text-slate-400 mt-1">High-priority tickets will appear here automatically</p>
+                        </form>
                       </div>
                     )}
                   </div>
-                </div>
-
+                )}
               </div>
               
               {/* Emergency Dispatch Control Center */}
