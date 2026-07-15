@@ -4529,18 +4529,68 @@ CITY_WATER_BASELINES = {
 }
 DEFAULT_WATER_LIVE = {"storage_pct": 65, "demand_mld": 1000, "treatment_pct": 90}
 
+def get_city_coords(city: str):
+    # Lookup in INDIA_CITY_LIST
+    for item in INDIA_CITY_LIST:
+        if item["value"] == city.lower() or item["label"].lower() == city.lower():
+            return item["lat"], item["lng"]
+    return 19.0760, 72.8777
+
+
+def get_city_baseline_key(city: str):
+    c = city.lower().strip()
+    if c in ["delhi", "new delhi", "newdelhi"]:
+        return "delhi"
+    if c in ["bengaluru", "bangalore"]:
+        return "bangalore"
+    return c.replace(" ", "")
+
+
 @app.get("/api/water/live")
 def get_water_live(city: str = "Mumbai"):
     import random
-    city_key = city.lower().replace(" ", "")
+    lat, lng = get_city_coords(city)
+    
+    # Fetch live weather/precipitation/temperature from Open-Meteo
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&current=temperature_2m,precipitation&daily=precipitation_sum&timezone=auto"
+    try:
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            curr = data.get("current", {})
+            temp = curr.get("temperature_2m", 25.0)
+            precip = curr.get("precipitation", 0.0)
+            
+            daily = data.get("daily", {})
+            precip_sum = sum(daily.get("precipitation_sum", [0.0])) if daily.get("precipitation_sum") else 0.0
+        else:
+            temp, precip, precip_sum = 25.0, 0.0, 0.0
+    except Exception as e:
+        logger.error(f"Error fetching live weather for water telemetry: {e}")
+        temp, precip, precip_sum = 25.0, 0.0, 0.0
+
+    city_key = get_city_baseline_key(city)
     base = CITY_WATER_BASELINES.get(city_key, DEFAULT_WATER_LIVE)
+    
+    # Calculate storage dynamically: starts at base, goes up with precipitation sum, drops with high temperatures
+    temp_evap_factor = max(0, temp - 20) * 0.25
+    precip_gain = precip_sum * 1.8
+    storage = min(100, max(15, round(base["storage_pct"] + precip_gain - temp_evap_factor)))
+    
+    # Calculate demand dynamically: scales up with high temperature
+    temp_demand_factor = 1.0 + max(0, temp - 20) * 0.018
+    demand = round(base["demand_mld"] * temp_demand_factor)
+    
+    treatment = base["treatment_pct"]
+    
     return {
         "city": city,
-        "storage_pct": max(10, min(100, base["storage_pct"] + random.randint(-3, 3))),
-        "demand_mld": base["demand_mld"],
-        "treatment_pct": base["treatment_pct"],
-        "status": "Critical" if base["storage_pct"] < 40 else ("Warning" if base["storage_pct"] < 60 else "Good")
+        "storage_pct": storage,
+        "demand_mld": demand,
+        "treatment_pct": treatment,
+        "status": "Critical" if storage < 40 else ("Warning" if storage < 60 else "Good")
     }
+
 
 CITY_HEALTH_BASELINES = {
     "mumbai":    {"active_outbreaks": 2, "hospitals": 1200, "bed_occupancy_pct": 78},
@@ -4556,18 +4606,52 @@ CITY_HEALTH_BASELINES = {
 }
 DEFAULT_HEALTH_LIVE = {"active_outbreaks": 1, "hospitals": 500, "bed_occupancy_pct": 70}
 
+
 @app.get("/api/health/live")
 def get_health_live(city: str = "Mumbai"):
     import random
-    city_key = city.lower().replace(" ", "")
+    lat, lng = get_city_coords(city)
+    
+    pm25 = 15.0
+    temp = 25.0
+    
+    try:
+        aqi_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={lat}&longitude={lng}&current=pm2_5"
+        aqi_res = requests.get(aqi_url, timeout=5)
+        if aqi_res.status_code == 200:
+            pm25 = aqi_res.json().get("current", {}).get("pm2_5", 15.0)
+    except Exception as e:
+        logger.error(f"Error fetching AQI for health telemetry: {e}")
+        
+    try:
+        w_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&current=temperature_2m"
+        w_res = requests.get(w_url, timeout=5)
+        if w_res.status_code == 200:
+            temp = w_res.json().get("current", {}).get("temperature_2m", 25.0)
+    except Exception as e:
+        logger.error(f"Error fetching weather for health telemetry: {e}")
+        
+    city_key = get_city_baseline_key(city)
     base = CITY_HEALTH_BASELINES.get(city_key, DEFAULT_HEALTH_LIVE)
+    
+    outbreaks = base["active_outbreaks"]
+    if pm25 > 75 or temp > 38:
+        outbreaks += 2
+    elif pm25 > 35 or temp > 33:
+        outbreaks += 1
+        
+    pm25_impact = (pm25 / 3.5)
+    temp_impact = max(0, temp - 30) * 1.5
+    bed_occ = min(98, max(25, round(base["bed_occupancy_pct"] + pm25_impact + temp_impact)))
+    
     return {
         "city": city,
-        "active_outbreaks": base["active_outbreaks"],
+        "active_outbreaks": outbreaks,
         "hospitals": base["hospitals"],
-        "bed_occupancy_pct": base["bed_occupancy_pct"] + random.randint(-2, 2),
-        "status": "Critical" if base["active_outbreaks"] > 2 else ("Warning" if base["active_outbreaks"] > 0 else "Good")
+        "bed_occupancy_pct": bed_occ,
+        "status": "Critical" if outbreaks > 2 else ("Warning" if outbreaks > 0 else "Good")
     }
+
 
 CITY_SOLAR_BASELINES = {
     "mumbai":    {"solar_pct": 22, "installed_mw": 480,  "co2_saved_tpd": 920},
@@ -4583,17 +4667,34 @@ CITY_SOLAR_BASELINES = {
 }
 DEFAULT_SOLAR_LIVE = {"solar_pct": 22, "installed_mw": 400, "co2_saved_tpd": 800}
 
+
 @app.get("/api/solar/live")
 def get_solar_live(city: str = "Mumbai"):
     import random
-    city_key = city.lower().replace(" ", "")
+    lat, lng = get_city_coords(city)
+    
+    cloud_cover = 30.0
+    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&current=cloud_cover&timezone=auto"
+    try:
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            cloud_cover = res.json().get("current", {}).get("cloud_cover", 30.0)
+    except Exception as e:
+        logger.error(f"Error fetching cloud cover for solar telemetry: {e}")
+        
+    city_key = get_city_baseline_key(city)
     base = CITY_SOLAR_BASELINES.get(city_key, DEFAULT_SOLAR_LIVE)
+    
+    efficiency = max(5, 100 - int(cloud_cover))
+    current_mw = round(base["installed_mw"] * (efficiency / 100.0), 1)
+    co2_saved = round(current_mw * 0.43 * 2.2, 1)
+    
     return {
         "city": city,
-        "solar_pct": max(5, min(100, base["solar_pct"] + random.randint(-3, 3))),
+        "solar_pct": efficiency,
         "installed_mw": base["installed_mw"],
-        "co2_saved_tpd": base["co2_saved_tpd"],
-        "status": "Good" if base["solar_pct"] > 30 else ("Warning" if base["solar_pct"] > 15 else "Critical")
+        "co2_saved_tpd": co2_saved,
+        "status": "Good" if efficiency > 60 else ("Warning" if efficiency > 30 else "Critical")
     }
 
 
