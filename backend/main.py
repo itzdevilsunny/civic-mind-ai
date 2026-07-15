@@ -83,8 +83,13 @@ def init_db():
             officer TEXT NOT NULL,
             stage INTEGER DEFAULT 0,
             description TEXT,
-            submitted_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+            submitted_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            image TEXT
         );
+        cursor.execute("PRAGMA table_info(tickets)")
+        columns = [col[1] for col in cursor.fetchall()]
+        if "image" not in columns:
+            cursor.execute("ALTER TABLE tickets ADD COLUMN image TEXT")
         """)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS telemetry_logs (
@@ -215,10 +220,10 @@ def db_create_ticket(ticket: dict):
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO tickets (id, title, category, priority, status, department, officer, stage, description, submitted_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO tickets (id, title, category, priority, status, department, officer, stage, description, submitted_at, image)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (ticket["id"], ticket["title"], ticket["category"], ticket["priority"], ticket["status"], ticket["department"], ticket["officer"], ticket["stage"], ticket["description"], ticket["submitted_at"])
+            (ticket["id"], ticket["title"], ticket["category"], ticket["priority"], ticket["status"], ticket["department"], ticket["officer"], ticket["stage"], ticket["description"], ticket["submitted_at"], ticket.get("image"))
         )
         conn.commit()
         conn.close()
@@ -426,6 +431,7 @@ class ComplaintSubmit(BaseModel):
     category: str
     priority: str
     description: str
+    image: Optional[str] = None
 
 class ChatMessage(BaseModel):
     message: str
@@ -2319,7 +2325,15 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
         "submitted_at": datetime.now(timezone.utc).isoformat()
     }
 
+    new_ticket["image"] = complaint.image
     db_create_ticket(new_ticket)
+
+    # Push to active SSE queues for instant Admin alert notifications!
+    for q in emergency_queues:
+        try:
+            q.put_nowait(new_ticket)
+        except Exception as e:
+            logger.error(f"Error putting new ticket in SSE queue: {e}")
 
     # Start the background task to simulate ticket progress stepper
     background_tasks.add_task(simulate_ticket_pipeline, ticket_id)
@@ -4901,7 +4915,8 @@ async def get_live_emergencies(request: Request, city: str = "Mumbai", lat: floa
                     "lon": lng + dlng,
                     "status": ticket["status"],
                     "timestamp": ticket.get("submitted_at"),
-                    "is_new": False
+                    "is_new": False,
+                    "image": ticket.get("image")
                 }
                 yield json.dumps({"type": "EMERGENCY", "event": event_data})
         except Exception as e:
@@ -4928,7 +4943,8 @@ async def get_live_emergencies(request: Request, city: str = "Mumbai", lat: floa
                     "lon": lng + dlng,
                     "status": ticket["status"],
                     "timestamp": ticket.get("submitted_at"),
-                    "is_new": True
+                    "is_new": True,
+                    "image": ticket.get("image")
                 }
                 yield json.dumps({"type": "EMERGENCY", "event": event_data})
             except asyncio.TimeoutError:

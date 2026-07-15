@@ -343,7 +343,8 @@ export default function App() {
     title: '',
     category: 'Roads & Bridges',
     priority: 'Medium',
-    description: ''
+    description: '',
+    image: ''
   });
 
   const [proposalForm, setProposalForm] = useState({
@@ -501,7 +502,8 @@ export default function App() {
                 ts: Date.now(),
                 read: false,
                 lat: evt.lat,
-                lon: evt.lon
+                lon: evt.lon,
+                image: evt.image
               },
               ...prev
             ];
@@ -652,7 +654,7 @@ export default function App() {
       .then(res => res.json())
       .then(createdTicket => {
         setTickets(prev => [createdTicket, ...prev]);
-        setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '' });
+        setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '', image: '' });
         setSystemLogs(prev => [`[Database Sync] Ticket ${createdTicket.id} classified by Gemini. Routing to ${createdTicket.department}...`, ...prev]);
         confetti({ particleCount: 80, spread: 60 });
       })
@@ -676,10 +678,11 @@ export default function App() {
           officer: 'Auto-Assigned',
           submittedAt: new Date().toISOString(),
           stage: 0,
-          description: complaintForm.description
+          description: complaintForm.description,
+          image: complaintForm.image
         };
         setTickets(prev => [fallbackTicket, ...prev]);
-        setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '' });
+        setComplaintForm({ title: '', category: 'Roads & Bridges', priority: 'Medium', description: '', image: '' });
         setSystemLogs(prev => [`[Offline Sandbox] Local ticket ${fallbackTicket.id} registered.`, ...prev]);
         confetti({ particleCount: 80, spread: 60 });
       });
@@ -1873,6 +1876,47 @@ export default function App() {
                         />
                       </div>
 
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                          <span>📸 Attach Live / Upload Image</span>
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <label 
+                            className="flex items-center justify-center gap-2 cursor-pointer border border-dashed border-slate-350 dark:border-slate-800 rounded-lg p-3 hover:bg-slate-50 dark:hover:bg-slate-900/40 text-xs font-bold text-slate-650 dark:text-slate-350 transition-colors w-full"
+                          >
+                            <span>📷 Take Photo / Choose File</span>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setComplaintForm(prev => ({ ...prev, image: reader.result }));
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                              className="hidden" 
+                            />
+                          </label>
+                          
+                          {complaintForm.image && (
+                            <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 flex-shrink-0">
+                              <img src={complaintForm.image} alt="Report preview" className="w-full h-full object-cover" />
+                              <button 
+                                type="button"
+                                onClick={() => setComplaintForm(prev => ({ ...prev, image: '' }))}
+                                className="absolute top-0.5 right-0.5 bg-black/60 hover:bg-black/80 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px]"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       <button type="submit" className="btn-3d btn-primary mt-2 w-full">Submit Ticket</button>
                     </form>
                   ) : (
@@ -2355,6 +2399,11 @@ export default function App() {
             </button>
           </div>
           <p className="mt-2 text-[11px] text-slate-300 leading-relaxed">{activeToast.description}</p>
+          {activeToast.image && (
+            <div className="mt-2.5 rounded-lg overflow-hidden border border-slate-800/80 max-h-32">
+              <img src={activeToast.image} alt="Reported problem attachment" className="w-full h-full object-cover" />
+            </div>
+          )}
           <div className="mt-3 flex gap-2 justify-end">
             <button
               onClick={() => setActiveToast(null)}

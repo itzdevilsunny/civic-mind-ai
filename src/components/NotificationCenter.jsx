@@ -216,6 +216,11 @@ export default function NotificationCenter({ isOpen, onClose, alerts, onMarkRead
                       <p style={{ fontSize: "10px", marginTop: "3px", color: isDarkMode ? "#94a3b8" : "#64748b", lineHeight: 1.5 }}>
                         {alert.body}
                       </p>
+                      {alert.image && (
+                        <div style={{ marginTop: "6px", borderRadius: "6px", overflow: "hidden", border: "1px solid rgba(0,0,0,0.15)", maxHeight: "90px" }}>
+                          <img src={alert.image} alt="Alert attachment" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        </div>
+                      )}
                       {!alert.read && (
                         <button
                           onClick={() => onMarkRead(alert.id)}
