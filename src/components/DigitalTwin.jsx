@@ -233,6 +233,7 @@ export default function DigitalTwin({
 
   const [vehicles, setVehicles] = useState([]);
   const routeLineRef = useRef(null);
+  const rerouteLineRef = useRef(null);
 
   // Style injector for map dash animations and pulsing rings
   useEffect(() => {
@@ -752,6 +753,84 @@ export default function DigitalTwin({
     }
   };
 
+  const handleReroute = (node) => {
+    if (!cityInfo || !window.L || !mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+    if (rerouteLineRef.current) {
+      map.removeLayer(rerouteLineRef.current);
+      rerouteLineRef.current = null;
+    }
+
+    const startPoint = [cityInfo.lat - 0.006, cityInfo.lng - 0.006];
+    const congestedPoint = [node.lat, node.lon];
+    const endPoint = [cityInfo.lat + 0.006, cityInfo.lng + 0.006];
+    const detourPoint = [congestedPoint[0] + 0.003, congestedPoint[1] - 0.003];
+
+    const polyline = window.L.polyline([startPoint, detourPoint, endPoint], {
+      color: '#06b6d4',
+      weight: 5,
+      opacity: 0.95,
+      className: 'animate-dash'
+    }).addTo(map);
+
+    rerouteLineRef.current = polyline;
+    map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+
+    let step = 0;
+    const stepCount = 50;
+    setVehicles(prev => prev.filter(v => v.id !== 'v-rerouted-unit'));
+
+    const interval = setInterval(() => {
+      step += 1;
+      const t = step / stepCount;
+      let curLat, curLng;
+      
+      if (t < 0.5) {
+        const tSeg = t * 2;
+        curLat = startPoint[0] + (detourPoint[0] - startPoint[0]) * tSeg;
+        curLng = startPoint[1] + (detourPoint[1] - startPoint[1]) * tSeg;
+      } else {
+        const tSeg = (t - 0.5) * 2;
+        curLat = detourPoint[0] + (endPoint[0] - detourPoint[0]) * tSeg;
+        curLng = detourPoint[1] + (endPoint[1] - detourPoint[1]) * tSeg;
+      }
+
+      setVehicles(prev => {
+        const idx = prev.findIndex(v => v.id === 'v-rerouted-unit');
+        const unit = {
+          id: 'v-rerouted-unit',
+          name: `Rerouted Commuter Flow (Bypassing ${node.name})`,
+          type: 'rerouted',
+          lat: curLat,
+          lon: curLng,
+          color: '#06b6d4',
+          symbol: '🔀',
+          heading: 0
+        };
+        if (idx === -1) return [...prev, unit];
+        const updated = [...prev];
+        updated[idx] = unit;
+        return updated;
+      });
+
+      if (step >= stepCount) {
+        clearInterval(interval);
+        setTimeout(() => {
+          if (rerouteLineRef.current && mapInstanceRef.current) {
+            mapInstanceRef.current.removeLayer(rerouteLineRef.current);
+            rerouteLineRef.current = null;
+          }
+          setVehicles(prev => prev.filter(v => v.id !== 'v-rerouted-unit'));
+        }, 8000);
+      }
+    }, 100);
+  };
+
   const handleEmergencyDispatch = (serviceId, ticketId) => {
     fetch('/api/emergency/dispatch', {
       method: 'POST',
@@ -902,14 +981,23 @@ export default function DigitalTwin({
             )}
 
             {['Congested', 'Critical', 'Active'].includes(selectedNode.status) && selectedNode.type !== 'emergency' && (
-              <button
-                onClick={() => handleDispatch(selectedNode)}
-                className="btn-3d btn-primary text-xs w-full mt-3 flex items-center justify-center gap-1.5"
-                style={{ padding: '0.4rem 0.8rem', cursor: 'pointer' }}
-              >
-                <Activity className="w-3.5 h-3.5 animate-pulse" />
-                <span>Dispatch Resolution Team</span>
-              </button>
+              <div className="flex flex-col gap-2 mt-3">
+                <button
+                  onClick={() => handleDispatch(selectedNode)}
+                  className="btn-3d btn-primary text-xs w-full flex items-center justify-center gap-1.5"
+                  style={{ padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+                >
+                  <Activity className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Dispatch Resolution Team</span>
+                </button>
+                <button
+                  onClick={() => handleReroute(selectedNode)}
+                  className="btn-3d btn-secondary text-xs w-full flex items-center justify-center gap-1.5"
+                  style={{ padding: '0.4rem 0.8rem', cursor: 'pointer', background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4', borderColor: 'rgba(6, 182, 212, 0.3)' }}
+                >
+                  <span>🔀 Simulate Route Rerouting</span>
+                </button>
+              </div>
             )}
           </div>
         )}
