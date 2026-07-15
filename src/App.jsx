@@ -354,6 +354,20 @@ export default function App() {
     description: ''
   });
   const [isSubmittingProposal, setIsSubmittingProposal] = useState(false);
+
+  // CCTV Vision & Proposal Sentiment States
+  const [cctvAnalysis, setCctvAnalysis] = useState({
+    CCTV_01: null,
+    CCTV_02: null,
+    CCTV_03: null
+  });
+  const [cctvLoading, setCctvLoading] = useState({
+    CCTV_01: false,
+    CCTV_02: false,
+    CCTV_03: false
+  });
+  const [proposalSentiment, setProposalSentiment] = useState({});
+  const [proposalSentimentLoading, setProposalSentimentLoading] = useState({});
   
   // AI Copilot States
   const [complaintMode, setComplaintMode] = useState('form'); // 'form' | 'ai'
@@ -640,6 +654,49 @@ export default function App() {
       });
       confetti({ particleCount: 60, spread: 40 });
     }
+  };
+
+  const handleAnalyzeCCTV = (cameraId) => {
+    setCctvLoading(prev => ({ ...prev, [cameraId]: true }));
+    fetch('/api/cctv/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ camera_id: cameraId, city: cityInfo.label })
+    })
+      .then(r => r.json())
+      .then(res => {
+        setCctvAnalysis(prev => ({ ...prev, [cameraId]: res }));
+        setCctvLoading(prev => ({ ...prev, [cameraId]: false }));
+        setSystemLogs(prev => [`Vanguard Vision: Completed CCTV feed analysis on ${cameraId}. ${res.hazards.length} hazards identified.`, ...prev]);
+      })
+      .catch(err => {
+        console.error("CCTV analysis error:", err);
+        setCctvLoading(prev => ({ ...prev, [cameraId]: false }));
+      });
+  };
+
+  const handleForecastSentiment = (proposal) => {
+    setProposalSentimentLoading(prev => ({ ...prev, [proposal.id]: true }));
+    fetch('/api/proposals/sentiment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        proposal_id: proposal.id,
+        title: proposal.title,
+        description: proposal.description,
+        category: proposal.category
+      })
+    })
+      .then(r => r.json())
+      .then(res => {
+        setProposalSentiment(prev => ({ ...prev, [proposal.id]: res }));
+        setProposalSentimentLoading(prev => ({ ...prev, [proposal.id]: false }));
+        setSystemLogs(prev => [`AI Planner: Simulated policy approval scores for Proposal ${proposal.id}.`, ...prev]);
+      })
+      .catch(err => {
+        console.error("Sentiment forecast error:", err);
+        setProposalSentimentLoading(prev => ({ ...prev, [proposal.id]: false }));
+      });
   };
 
   const handleComplaintSubmit = (e) => {
@@ -1484,25 +1541,209 @@ export default function App() {
                   <span className="card-subtitle">Vanguard Computer Vision analytics feed</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80" alt="Piccadilly Traffic" className="w-full h-40 object-cover" />
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900">
-                      <div className="font-bold text-xs">CCTV_01: Piccadilly Circus</div>
-                      <div className="text-[10px] text-emerald-500 font-bold mt-1">STATUS: NORMAL FLOW</div>
+                  <style>{`
+                    @keyframes scan {
+                      0% { top: 0%; }
+                      50% { top: 98%; }
+                      100% { top: 0%; }
+                    }
+                  `}</style>
+                  
+                  {/* Camera 1 */}
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                    <div className="relative overflow-hidden w-full h-40 bg-black">
+                      <img 
+                        src="https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80" 
+                        alt="Piccadilly Traffic" 
+                        className={`w-full h-full object-cover transition-all duration-300 ${cctvLoading.CCTV_01 ? 'opacity-40 blur-sm' : ''}`} 
+                      />
+                      {cctvLoading.CCTV_01 && (
+                        <div className="absolute inset-x-0 h-1 bg-indigo-500 shadow-[0_0_12px_#6366f1]" style={{ animation: 'scan 1.2s infinite ease-in-out' }} />
+                      )}
+                      {cctvAnalysis.CCTV_01 && cctvAnalysis.CCTV_01.hazards.map((haz, idx) => (
+                        <div
+                          key={idx}
+                          className="absolute border border-rose-500 bg-rose-500/15 text-[8px] font-bold text-rose-300 p-0.5 pointer-events-none rounded select-none flex flex-col justify-between"
+                          style={{ left: `${haz.x}%`, top: `${haz.y}%`, width: `${haz.w}%`, height: `${haz.h}%`, boxShadow: '0 0 6px rgba(244,63,94,0.4)' }}
+                        >
+                          <span className="bg-rose-650 text-white px-1 py-0.2 rounded-sm text-[6px] tracking-wide block w-fit truncate">
+                            {haz.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 flex-1 flex flex-col justify-between gap-3">
+                      <div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-xs">CCTV_01: Piccadilly Circus</span>
+                          {cctvAnalysis.CCTV_01 ? (
+                            <span className="text-[8px] bg-rose-100 dark:bg-rose-950/40 text-rose-650 dark:text-rose-400 font-bold px-1.5 py-0.5 rounded">
+                              {cctvAnalysis.CCTV_01.status_text}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-450 font-bold px-1.5 py-0.5 rounded">
+                              NORMAL FLOW
+                            </span>
+                          )}
+                        </div>
+                        {cctvAnalysis.CCTV_01 && (
+                          <p className="text-[10px] text-slate-500 leading-normal mt-2">{cctvAnalysis.CCTV_01.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAnalyzeCCTV('CCTV_01')}
+                          disabled={cctvLoading.CCTV_01}
+                          className="btn btn-secondary text-[10px] py-1 px-2.5 flex-1 flex items-center justify-center gap-1 font-bold"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <span>🔍 Run Vision Scan</span>
+                        </button>
+                        {cctvAnalysis.CCTV_01 && (
+                          <button
+                            onClick={() => {
+                              setSystemLogs(prev => [`Safety Agent: [CCTV Vision Alert] Dispatched incident response crew to Piccadilly Circus.`, ...prev]);
+                              confetti({ particleCount: 80, spread: 60 });
+                            }}
+                            className="btn btn-primary text-[10px] py-1 px-2.5 flex items-center justify-center gap-1 font-bold"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <span>🚨 Dispatch</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=400&q=80" alt="City Bridge Traffic" className="w-full h-40 object-cover" />
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900">
-                      <div className="font-bold text-xs">CCTV_02: {cityInfo?.districts?.[2] || 'Main'} Crossing</div>
-                      <div className="text-[10px] text-emerald-500 font-bold mt-1">STATUS: NORMAL FLOW</div>
+
+                  {/* Camera 2 */}
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                    <div className="relative overflow-hidden w-full h-40 bg-black">
+                      <img 
+                        src="https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?auto=format&fit=crop&w=400&q=80" 
+                        alt="City Bridge Traffic" 
+                        className={`w-full h-full object-cover transition-all duration-300 ${cctvLoading.CCTV_02 ? 'opacity-40 blur-sm' : ''}`} 
+                      />
+                      {cctvLoading.CCTV_02 && (
+                        <div className="absolute inset-x-0 h-1 bg-indigo-500 shadow-[0_0_12px_#6366f1]" style={{ animation: 'scan 1.2s infinite ease-in-out' }} />
+                      )}
+                      {cctvAnalysis.CCTV_02 && cctvAnalysis.CCTV_02.hazards.map((haz, idx) => (
+                        <div
+                          key={idx}
+                          className="absolute border border-rose-500 bg-rose-500/15 text-[8px] font-bold text-rose-300 p-0.5 pointer-events-none rounded select-none flex flex-col justify-between"
+                          style={{ left: `${haz.x}%`, top: `${haz.y}%`, width: `${haz.w}%`, height: `${haz.h}%`, boxShadow: '0 0 6px rgba(244,63,94,0.4)' }}
+                        >
+                          <span className="bg-rose-650 text-white px-1 py-0.2 rounded-sm text-[6px] tracking-wide block w-fit truncate">
+                            {haz.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 flex-1 flex flex-col justify-between gap-3">
+                      <div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-xs">CCTV_02: {cityInfo?.districts?.[2] || 'Main'} Crossing</span>
+                          {cctvAnalysis.CCTV_02 ? (
+                            <span className="text-[8px] bg-rose-100 dark:bg-rose-950/40 text-rose-650 dark:text-rose-400 font-bold px-1.5 py-0.5 rounded">
+                              {cctvAnalysis.CCTV_02.status_text}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-450 font-bold px-1.5 py-0.5 rounded">
+                              NORMAL FLOW
+                            </span>
+                          )}
+                        </div>
+                        {cctvAnalysis.CCTV_02 && (
+                          <p className="text-[10px] text-slate-500 leading-normal mt-2">{cctvAnalysis.CCTV_02.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAnalyzeCCTV('CCTV_02')}
+                          disabled={cctvLoading.CCTV_02}
+                          className="btn btn-secondary text-[10px] py-1 px-2.5 flex-1 flex items-center justify-center gap-1 font-bold"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <span>🔍 Run Vision Scan</span>
+                        </button>
+                        {cctvAnalysis.CCTV_02 && (
+                          <button
+                            onClick={() => {
+                              setSystemLogs(prev => [`Safety Agent: [CCTV Vision Alert] Dispatched incident response crew to ${cityInfo?.districts?.[2] || 'Main'} Crossing.`, ...prev]);
+                              confetti({ particleCount: 80, spread: 60 });
+                            }}
+                            className="btn btn-primary text-[10px] py-1 px-2.5 flex items-center justify-center gap-1 font-bold"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <span>🚨 Dispatch</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80" alt="City Traffic" className="w-full h-40 object-cover" />
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900">
-                      <div className="font-bold text-xs">CCTV_03: {cityInfo?.districts?.[3] || 'Secondary'} Flyover</div>
-                      <div className="text-[10px] text-rose-500 font-bold mt-1 animate-pulse">STATUS: CONGESTED (84%)</div>
+
+                  {/* Camera 3 */}
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden flex flex-col justify-between">
+                    <div className="relative overflow-hidden w-full h-40 bg-black">
+                      <img 
+                        src="https://images.unsplash.com/photo-1494783367193-149034c05e8f?auto=format&fit=crop&w=400&q=80" 
+                        alt="City Traffic" 
+                        className={`w-full h-full object-cover transition-all duration-300 ${cctvLoading.CCTV_03 ? 'opacity-40 blur-sm' : ''}`} 
+                      />
+                      {cctvLoading.CCTV_03 && (
+                        <div className="absolute inset-x-0 h-1 bg-indigo-500 shadow-[0_0_12px_#6366f1]" style={{ animation: 'scan 1.2s infinite ease-in-out' }} />
+                      )}
+                      {cctvAnalysis.CCTV_03 && cctvAnalysis.CCTV_03.hazards.map((haz, idx) => (
+                        <div
+                          key={idx}
+                          className="absolute border border-rose-500 bg-rose-500/15 text-[8px] font-bold text-rose-300 p-0.5 pointer-events-none rounded select-none flex flex-col justify-between"
+                          style={{ left: `${haz.x}%`, top: `${haz.y}%`, width: `${haz.w}%`, height: `${haz.h}%`, boxShadow: '0 0 6px rgba(244,63,94,0.4)' }}
+                        >
+                          <span className="bg-rose-650 text-white px-1 py-0.2 rounded-sm text-[6px] tracking-wide block w-fit truncate">
+                            {haz.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 flex-1 flex flex-col justify-between gap-3">
+                      <div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-xs">CCTV_03: {cityInfo?.districts?.[3] || 'Secondary'} Flyover</span>
+                          {cctvAnalysis.CCTV_03 ? (
+                            <span className="text-[8px] bg-rose-100 dark:bg-rose-950/40 text-rose-650 dark:text-rose-400 font-bold px-1.5 py-0.5 rounded">
+                              {cctvAnalysis.CCTV_03.status_text}
+                            </span>
+                          ) : (
+                            <span className="text-[8px] bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-450 font-bold px-1.5 py-0.5 rounded animate-pulse">
+                              CONGESTED (84%)
+                            </span>
+                          )}
+                        </div>
+                        {cctvAnalysis.CCTV_03 && (
+                          <p className="text-[10px] text-slate-500 leading-normal mt-2">{cctvAnalysis.CCTV_03.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleAnalyzeCCTV('CCTV_03')}
+                          disabled={cctvLoading.CCTV_03}
+                          className="btn btn-secondary text-[10px] py-1 px-2.5 flex-1 flex items-center justify-center gap-1 font-bold"
+                          style={{ cursor: 'pointer' }}
+                        >
+                          <span>🔍 Run Vision Scan</span>
+                        </button>
+                        {cctvAnalysis.CCTV_03 && (
+                          <button
+                            onClick={() => {
+                              setSystemLogs(prev => [`Safety Agent: [CCTV Vision Alert] Dispatched incident response crew to ${cityInfo?.districts?.[3] || 'Secondary'} Flyover.`, ...prev]);
+                              confetti({ particleCount: 80, spread: 60 });
+                            }}
+                            className="btn btn-primary text-[10px] py-1 px-2.5 flex items-center justify-center gap-1 font-bold"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <span>🚨 Dispatch</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2298,6 +2539,77 @@ export default function App() {
                                 <p className="text-[10px] text-slate-500 leading-normal italic">"{prop.analysis}"</p>
                               </div>
                             )}
+
+                            {/* Public Sentiment Forecast Drawer */}
+                            <div className="mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-800/40">
+                              {!proposalSentiment[prop.id] ? (
+                                <button
+                                  onClick={() => handleForecastSentiment(prop)}
+                                  disabled={proposalSentimentLoading[prop.id]}
+                                  className="w-full btn btn-secondary text-[10px] py-1.5 flex items-center justify-center gap-1.5 font-bold"
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  {proposalSentimentLoading[prop.id] ? (
+                                    <>
+                                      <span className="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                                      <span>Forecasting Public Sentiment...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>📊 Predict Sentiment Radar</span>
+                                    </>
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="flex flex-col gap-2 p-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[9px] font-extrabold text-indigo-500 uppercase tracking-wide">AI DEMOGRAPHIC APPROVAL RADAR</span>
+                                    <button 
+                                      onClick={() => setProposalSentiment(prev => {
+                                        const updated = { ...prev };
+                                        delete updated[prop.id];
+                                        return updated;
+                                      })}
+                                      className="text-slate-400 hover:text-slate-650 text-[10px]"
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      ✕ Clear
+                                    </button>
+                                  </div>
+                                  
+                                  <div className="h-44 w-full">
+                                    <ReactECharts 
+                                      option={{
+                                        backgroundColor: 'transparent',
+                                        radar: {
+                                          indicator: proposalSentiment[prop.id].radar_indicators.map(ind => ({ name: ind.name, max: 100 })),
+                                          radius: '62%',
+                                          center: ['50%', '50%'],
+                                          splitNumber: 4,
+                                          axisName: { color: '#94a3b8', fontSize: 8 },
+                                          splitLine: { lineStyle: { color: 'rgba(99,102,241,0.12)' } },
+                                          splitArea: { show: false }
+                                        },
+                                        series: [{
+                                          type: 'radar',
+                                          data: [{
+                                            value: proposalSentiment[prop.id].radar_indicators.map(ind => ind.score),
+                                            name: 'Approval Rating',
+                                            itemStyle: { color: '#6366f1' },
+                                            areaStyle: { color: 'rgba(99,102,241,0.18)' }
+                                          }]
+                                        }]
+                                      }} 
+                                      style={{ height: '100%', width: '100%' }} 
+                                    />
+                                  </div>
+
+                                  <p className="text-[10px] text-slate-550 dark:text-slate-350 leading-relaxed font-sans border-t border-slate-100 dark:border-slate-850 pt-2 mt-1">
+                                    💡 <strong>Forecast Summary:</strong> {proposalSentiment[prop.id].summary}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })
