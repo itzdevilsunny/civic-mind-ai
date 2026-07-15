@@ -484,6 +484,9 @@ export default function App() {
       try {
         const parsed = JSON.parse(event.data);
         if (parsed.type === 'EMERGENCY') {
+          // RESTRICTION: Only city administrators receive live emergencies/toasts/alarms
+          if (!isSignedIn || userRole !== 'admin') return;
+
           const evt = parsed.event;
           
           // 1. Add to alerts list
@@ -534,7 +537,7 @@ export default function App() {
     return () => {
       eventSource.close();
     };
-  }, [selectedCity, cityInfo]);
+  }, [selectedCity, cityInfo, userRole, isSignedIn]);
 
   useEffect(() => {
     if (activeToast) {
@@ -1316,24 +1319,26 @@ export default function App() {
               {new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
             </span>
               <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsNotifOpen(true)}
-                style={{ position: 'relative', cursor: 'pointer', background: 'none', border: 'none', padding: '4px', display: 'flex', alignItems: 'center' }}
-                title="Alert Center"
-              >
-                <Bell className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                {alerts.filter(a => !a.read).length > 0 && (
-                  <span style={{
-                    position: 'absolute', top: '-2px', right: '-2px',
-                    width: '16px', height: '16px', borderRadius: '50%',
-                    background: 'linear-gradient(135deg,#f43f5e,#e11d48)',
-                    fontSize: '8px', fontWeight: 900, color: 'white',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    boxShadow: '0 0 8px rgba(244,63,94,0.6)',
-                    animation: 'pulse 2s infinite',
-                  }}>{alerts.filter(a => !a.read).length}</span>
-                )}
-              </button>
+              {isSignedIn && userRole === 'admin' && (
+                <button
+                  onClick={() => setIsNotifOpen(true)}
+                  style={{ position: 'relative', cursor: 'pointer', background: 'none', border: 'none', padding: '4px', display: 'flex', alignItems: 'center' }}
+                  title="Alert Center"
+                >
+                  <Bell className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                  {alerts.filter(a => !a.read).length > 0 && (
+                    <span style={{
+                      position: 'absolute', top: '-2px', right: '-2px',
+                      width: '16px', height: '16px', borderRadius: '50%',
+                      background: 'linear-gradient(135deg,#f43f5e,#e11d48)',
+                      fontSize: '8px', fontWeight: 900, color: 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 0 8px rgba(244,63,94,0.6)',
+                      animation: 'pulse 2s infinite',
+                    }}>{alerts.filter(a => !a.read).length}</span>
+                  )}
+                </button>
+              )}
               <LanguageSwitcher
                 selectedLang={selectedLang}
                 onLangChange={setSelectedLang}
@@ -1452,6 +1457,7 @@ export default function App() {
                   bikepointsList={bikepoints.stations || []}
                   onEmergencyDispatch={loadLiveData}
                   cityInfo={cityInfo}
+                  userRole={userRole}
                   dispatchedEmergency={dispatchedEmergency}
                   onClearDispatch={() => setDispatchedEmergency(null)}
                   onSelectNode={(node) => {

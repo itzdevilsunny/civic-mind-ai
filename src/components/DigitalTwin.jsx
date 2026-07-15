@@ -212,7 +212,8 @@ export default function DigitalTwin({
   bikepointsList = [], 
   cityInfo,
   dispatchedEmergency,
-  onClearDispatch
+  onClearDispatch,
+  userRole
 }) {
   const [nodes, setNodes] = useState([]);
   const [emergencyServices, setEmergencyServices] = useState([]);
@@ -951,53 +952,63 @@ export default function DigitalTwin({
             {selectedNode.type === 'emergency' && (
               <div className="mt-3 pt-3 border-t border-slate-150 dark:border-slate-800">
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">DISPATCH TO ACTIVE TICKET</label>
-                {activeTickets.filter(t => t.status !== 'Resolved').length === 0 ? (
-                  <p className="text-[11px] text-slate-450 italic">No active citizen complaints to coordinate.</p>
+                {userRole === 'admin' ? (
+                  activeTickets.filter(t => t.status !== 'Resolved').length === 0 ? (
+                    <p className="text-[11px] text-slate-450 italic">No active citizen complaints to coordinate.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <select 
+                        id="emergency-dispatch-select"
+                        className="form-input text-xs py-1 px-1.5"
+                      >
+                        {activeTickets.filter(t => t.status !== 'Resolved').map(t => (
+                          <option key={t.id} value={t.id}>{t.id} - {t.title}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          const selectEl = document.getElementById('emergency-dispatch-select');
+                          if (selectEl && selectEl.value) {
+                            handleEmergencyDispatch(selectedNode.id, selectEl.value);
+                          }
+                        }}
+                        className="btn btn-primary text-xs py-1.5 w-full flex items-center justify-center gap-1.5"
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <span>Dispatch Roster Unit</span>
+                      </button>
+                    </div>
+                  )
                 ) : (
-                  <div className="flex flex-col gap-2">
-                    <select 
-                      id="emergency-dispatch-select"
-                      className="form-input text-xs py-1 px-1.5"
-                    >
-                      {activeTickets.filter(t => t.status !== 'Resolved').map(t => (
-                        <option key={t.id} value={t.id}>{t.id} - {t.title}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => {
-                        const selectEl = document.getElementById('emergency-dispatch-select');
-                        if (selectEl && selectEl.value) {
-                          handleEmergencyDispatch(selectedNode.id, selectEl.value);
-                        }
-                      }}
-                      className="btn btn-primary text-xs py-1.5 w-full flex items-center justify-center gap-1.5"
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <span>Dispatch Roster Unit</span>
-                    </button>
-                  </div>
+                  <p className="text-[10px] text-slate-450 italic">🔒 Dispatch operations reserved for administrators.</p>
                 )}
               </div>
             )}
 
             {['Congested', 'Critical', 'Active'].includes(selectedNode.status) && selectedNode.type !== 'emergency' && (
-              <div className="flex flex-col gap-2 mt-3">
-                <button
-                  onClick={() => handleDispatch(selectedNode)}
-                  className="btn-3d btn-primary text-xs w-full flex items-center justify-center gap-1.5"
-                  style={{ padding: '0.4rem 0.8rem', cursor: 'pointer' }}
-                >
-                  <Activity className="w-3.5 h-3.5 animate-pulse" />
-                  <span>Dispatch Resolution Team</span>
-                </button>
-                <button
-                  onClick={() => handleReroute(selectedNode)}
-                  className="btn-3d btn-secondary text-xs w-full flex items-center justify-center gap-1.5"
-                  style={{ padding: '0.4rem 0.8rem', cursor: 'pointer', background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4', borderColor: 'rgba(6, 182, 212, 0.3)' }}
-                >
-                  <span>🔀 Simulate Route Rerouting</span>
-                </button>
-              </div>
+              userRole === 'admin' ? (
+                <div className="flex flex-col gap-2 mt-3">
+                  <button
+                    onClick={() => handleDispatch(selectedNode)}
+                    className="btn-3d btn-primary text-xs w-full flex items-center justify-center gap-1.5"
+                    style={{ padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+                  >
+                    <Activity className="w-3.5 h-3.5 animate-pulse" />
+                    <span>Dispatch Resolution Team</span>
+                  </button>
+                  <button
+                    onClick={() => handleReroute(selectedNode)}
+                    className="btn-3d btn-secondary text-xs w-full flex items-center justify-center gap-1.5"
+                    style={{ padding: '0.4rem 0.8rem', cursor: 'pointer', background: 'rgba(6, 182, 212, 0.1)', color: '#06b6d4', borderColor: 'rgba(6, 182, 212, 0.3)' }}
+                  >
+                    <span>🔀 Simulate Route Rerouting</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-3 p-2 bg-slate-50 dark:bg-slate-850 rounded border border-slate-100 dark:border-slate-800 text-[10px] text-slate-500 text-center font-medium">
+                  🔒 Dispatch and Rerouting controls are locked. Log in as Admin to access.
+                </div>
+              )
             )}
           </div>
         )}
