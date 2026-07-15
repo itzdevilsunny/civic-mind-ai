@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
+import confetti from 'canvas-confetti';
 import {
   IndianRupee, TrendingUp, TrendingDown, AlertTriangle,
   Zap, Building2, BarChart3, Lightbulb, RefreshCw, ShieldCheck, Activity
@@ -126,6 +127,93 @@ export default function CityBudget() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [animateIn, setAnimateIn] = useState(false);
+
+  // Budget Simulation States
+  const [simSource, setSimSource] = useState("Municipal Solid Waste Management");
+  const [simTarget, setSimTarget] = useState("Water Board & Power Corporation");
+  const [simAmount, setSimAmount] = useState(30);
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResult, setSimResult] = useState(null);
+  const [simSuccess, setSimSuccess] = useState(false);
+
+  const handleSimulate = () => {
+    if (simSource === simTarget) {
+      alert("Source and Target departments must be different.");
+      return;
+    }
+    setSimLoading(true);
+    setSimResult(null);
+    setSimSuccess(false);
+
+    fetch('/api/budget/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_dept: simSource,
+        target_dept: simTarget,
+        amount_lakhs: Number(simAmount)
+      })
+    })
+      .then(r => r.json())
+      .then(res => {
+        setSimResult(res);
+        setSimLoading(false);
+      })
+      .catch(err => {
+        console.error("Simulation error:", err);
+        setSimLoading(false);
+      });
+  };
+
+  const handleCommit = () => {
+    if (!simResult) return;
+    setSimSuccess(true);
+    // Play confetti
+    try {
+      confetti({ particleCount: 100, spread: 80 });
+    } catch (e) {
+      console.warn("Confetti failed:", e);
+    }
+    setTimeout(() => {
+      setSimResult(null);
+      setSimSuccess(false);
+      fetchBudget(); // reload budget stats
+    }, 4000);
+  };
+
+  const getSankeyChartOption = () => {
+    if (!simResult) return {};
+    const nodesSet = new Set();
+    simResult.flow_links.forEach(l => {
+      nodesSet.add(l.source);
+      nodesSet.add(l.target);
+    });
+    const nodes = Array.from(nodesSet).map(name => ({
+      name,
+      itemStyle: {
+        color: name.includes("Waste") || name.includes("Sanitation") ? "#f43f5e"
+             : name.includes("Water") || name.includes("Power") || name.includes("Grid") ? "#0ea5e9"
+             : name.includes("Works") || name.includes("Road") || name.includes("Bridge") ? "#f59e0b"
+             : name.includes("Police") || name.includes("Safety") ? "#8b5cf6"
+             : name.includes("Transit") || name.includes("Traffic") ? "#10b981"
+             : name.includes("Funds") || name.includes("Capital") ? "#6366f1"
+             : "#ec4899"
+      }
+    }));
+
+    return {
+      backgroundColor: 'transparent',
+      tooltip: { trigger: 'item', triggerOn: 'mousemove' },
+      series: [{
+        type: 'sankey',
+        data: nodes,
+        links: simResult.flow_links,
+        emphasis: { focus: 'adjacency' },
+        lineStyle: { color: 'source', curveness: 0.5, opacity: 0.35 },
+        label: { color: '#94a3b8', fontSize: 10 }
+      }]
+    };
+  };
 
   const fetchBudget = () => {
     setLoading(true);
@@ -339,6 +427,185 @@ export default function CityBudget() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </div>
+
+      {/* AI-Powered Smart Budget Reallocation Impact Simulator */}
+      <div className="card">
+        <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="card-title">
+              <Activity className="w-4 h-4 text-indigo-500 animate-pulse" /> AI Capital Reallocation Impact Simulator
+            </h3>
+            <span className="card-subtitle">Model 30-day cross-domain telemetry changes before shifting municipal funds</span>
+          </div>
+          <span className="text-[9px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-650 dark:text-indigo-400 font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+            CFO Simulation Engine
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Simulation input form */}
+          <div className="flex flex-col gap-4 p-4 rounded-xl bg-slate-50/50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-850">
+            <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200">Reallocation Setup</h4>
+            
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500">DEBIT BUDGET SOURCE</label>
+              <select 
+                value={simSource}
+                onChange={(e) => setSimSource(e.target.value)}
+                className="form-input text-xs"
+              >
+                <option value="Municipal Solid Waste Management">🗑️ Solid Waste Management</option>
+                <option value="Water Board & Power Corporation">⚡ Utilities & Electrical Grid</option>
+                <option value="Public Works Department (PWD)">🛣️ PWD Roads & Bridges</option>
+                <option value="City Police & Law Enforcement">🛡️ Public Safety & Police</option>
+                <option value="City Transit Authority">🚌 City Transit Authority</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold text-slate-500">CREDIT BUDGET TARGET</label>
+              <select 
+                value={simTarget}
+                onChange={(e) => setSimTarget(e.target.value)}
+                className="form-input text-xs"
+              >
+                <option value="Municipal Solid Waste Management">🗑️ Solid Waste Management</option>
+                <option value="Water Board & Power Corporation">⚡ Utilities & Electrical Grid</option>
+                <option value="Public Works Department (PWD)">🛣️ PWD Roads & Bridges</option>
+                <option value="City Police & Law Enforcement">🛡️ Public Safety & Police</option>
+                <option value="City Transit Authority">🚌 City Transit Authority</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                <span>TRANSFER AMOUNT</span>
+                <span className="text-indigo-600 dark:text-indigo-400">₹{simAmount} Lakhs</span>
+              </div>
+              <input 
+                type="range"
+                min="5"
+                max="150"
+                step="5"
+                value={simAmount}
+                onChange={(e) => setSimAmount(Number(e.target.value))}
+                className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+              />
+            </div>
+
+            <button
+              onClick={handleSimulate}
+              disabled={simLoading || simSource === simTarget}
+              className="btn-3d btn-primary text-xs w-full py-2.5 mt-2 flex items-center justify-center gap-2"
+              style={{ cursor: 'pointer' }}
+            >
+              {simLoading ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Projecting Flow Trade-offs...</span>
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Simulate Impact</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Simulation outputs & charts */}
+          <div className="lg:col-span-2 flex flex-col gap-4">
+            {!simResult && !simLoading && (
+              <div className="flex flex-col items-center justify-center h-full border border-dashed border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center text-slate-400">
+                <IndianRupee className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2 animate-bounce-subtle" />
+                <h5 className="text-xs font-bold text-slate-650 dark:text-slate-350">Simulation Ledger Standby</h5>
+                <p className="text-[10px] text-slate-500 max-w-xs mt-1">Configure the reallocation parameters and run the simulator to forecast cross-domain city impact.</p>
+              </div>
+            )}
+
+            {simLoading && (
+              <div className="flex flex-col items-center justify-center h-full border border-slate-100 dark:border-slate-850 rounded-xl p-8 text-center bg-slate-50/20 dark:bg-slate-900/10">
+                <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <h5 className="text-xs font-bold text-slate-650 dark:text-slate-300">Evaluating Trade-offs with Gemini</h5>
+                <p className="text-[10px] text-slate-500 mt-1">Running deep financial projection models and mapping IoT sensor telemetry outcomes...</p>
+              </div>
+            )}
+
+            {simResult && !simLoading && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">
+                {/* Sankey diagram */}
+                <div className="flex flex-col gap-2 border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-white dark:bg-slate-900/40">
+                  <span className="text-[10px] font-bold text-slate-450">CAPITAL & OPERATION FLOW (SANKEY)</span>
+                  <div className="h-40 md:h-44">
+                    <ReactECharts option={getSankeyChartOption()} style={{ height: '100%', width: '100%' }} />
+                  </div>
+                </div>
+
+                {/* Gemini feedback + changes */}
+                <div className="flex flex-col gap-3 justify-between">
+                  <div className="p-3 rounded-xl bg-indigo-500/5 border border-indigo-500/20">
+                    <span className="text-[10px] font-extrabold text-indigo-500 block mb-1">GEMINI IMPACT ANALYSIS</span>
+                    <p className="text-[10px] text-slate-650 dark:text-slate-300 leading-relaxed font-sans font-medium">
+                      {simResult.summary}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-2 border border-slate-100 dark:border-slate-800 rounded-xl p-3 bg-white dark:bg-slate-900/40">
+                    <span className="text-[10px] font-bold text-slate-450 block mb-1.5">PROJECTED 30-DAY TELEMETRY SHIFTS</span>
+                    <div className="flex flex-col gap-2.5">
+                      {simResult.metric_changes.map((item, idx) => {
+                        const shift = item.simulated - item.baseline;
+                        const isUplift = shift >= 0;
+                        return (
+                          <div key={idx} className="flex flex-col gap-1">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="font-semibold text-slate-600 dark:text-slate-350">{item.metric}</span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-400 font-mono">{item.baseline}% → {item.simulated}%</span>
+                                <span className={`font-bold px-1 py-0.2 rounded text-[8px] ${isUplift ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-450'}`}>
+                                  {isUplift ? '+' : ''}{shift}%
+                                </span>
+                              </div>
+                            </div>
+                            <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${isUplift ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                style={{ width: `${item.simulated}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleCommit}
+                    disabled={simSuccess}
+                    className={`btn-3d text-xs w-full py-2 flex items-center justify-center gap-2 font-bold transition-all ${
+                      simSuccess 
+                        ? 'bg-emerald-600 border-emerald-500 text-white animate-pulse'
+                        : 'btn-primary'
+                    }`}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {simSuccess ? (
+                      <>
+                        <ShieldCheck className="w-4 h-4 animate-bounce" />
+                        <span>Ledger Updated Successfully!</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>💾 Commit Budget Reallocation</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
