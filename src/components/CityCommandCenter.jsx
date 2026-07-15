@@ -40,6 +40,7 @@ function useLiveDomains(city, lat, lng) {
       DOMAINS.map(async (dom) => {
         try {
           const res = await fetch(dom.endpoint(city, lat, lng));
+          if (!res.ok) throw new Error('API Error');
           const json = await res.json();
           results[dom.key] = { raw: json, ...dom.extract(json) };
         } catch {

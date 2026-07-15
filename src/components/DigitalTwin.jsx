@@ -203,7 +203,17 @@ function CctvFeed({ node }) {
   );
 }
 
-export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = [], activeTickets = [], onEmergencyDispatch, bikepointsList = [], cityInfo }) {
+export default function DigitalTwin({ 
+  onSelectNode, 
+  activeIncident, 
+  nodesList = [], 
+  activeTickets = [], 
+  onEmergencyDispatch, 
+  bikepointsList = [], 
+  cityInfo,
+  dispatchedEmergency,
+  onClearDispatch
+}) {
   const [nodes, setNodes] = useState([]);
   const [emergencyServices, setEmergencyServices] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
@@ -220,6 +230,144 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
   });
   const [heatmapData, setHeatmapData] = useState([]);
   const heatmarkersRef = useRef({});
+
+  const [vehicles, setVehicles] = useState([]);
+  const routeLineRef = useRef(null);
+
+  // Style injector for map dash animations and pulsing rings
+  useEffect(() => {
+    const styleId = 'map-animation-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        @keyframes map-dash {
+          to {
+            stroke-dashoffset: -40;
+          }
+        }
+        .animate-dash {
+          stroke-dasharray: 8, 8;
+          animation: map-dash 1.2s linear infinite !important;
+        }
+        @keyframes pulse-ring {
+          0% {
+            stroke-opacity: 0.8;
+            fill-opacity: 0.15;
+            transform: scale(0.9);
+          }
+          100% {
+            stroke-opacity: 0;
+            fill-opacity: 0;
+            transform: scale(1.3);
+          }
+        }
+        .sensor-pulse-ring {
+          transform-origin: center;
+          animation: pulse-ring 2.5s ease-out infinite !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  // 1. Simulate standard moving vehicles
+  useEffect(() => {
+    if (!cityInfo) return;
+    const baseLat = cityInfo.lat;
+    const baseLng = cityInfo.lng;
+
+    const initialVehicles = [
+      { id: 'v-garbage', name: 'WasteNet Collect Truck #3', type: 'waste', lat: baseLat + 0.003, lon: baseLng - 0.004, speed: 0.0001, heading: Math.random() * 360, color: '#10b981', symbol: '🚚' },
+      { id: 'v-ambulance', name: 'Ambulance Unit A-12', type: 'ambulance', lat: baseLat - 0.004, lon: baseLng + 0.003, speed: 0.00015, heading: Math.random() * 360, color: '#ef4444', symbol: '🚑' },
+      { id: 'v-pwd', name: 'PWD Repair Crew', type: 'road', lat: baseLat + 0.002, lon: baseLng + 0.005, speed: 0.00008, heading: Math.random() * 360, color: '#f59e0b', symbol: '🚧' }
+    ];
+    setVehicles(initialVehicles);
+
+    const interval = setInterval(() => {
+      setVehicles(prev => prev.map(v => {
+        if (v.id === 'v-dispatched-unit') return v; // Skip updating dispatcher here
+        const rad = v.heading * Math.PI / 180;
+        let newLat = v.lat + Math.sin(rad) * v.speed;
+        let newLon = v.lon + Math.cos(rad) * v.speed;
+
+        if (Math.abs(newLat - baseLat) > 0.015 || Math.abs(newLon - baseLng) > 0.015) {
+          const newHeading = (v.heading + 180 + (Math.random() - 0.5) * 60) % 360;
+          return { ...v, heading: newHeading };
+        }
+        return { ...v, lat: newLat, lon: newLon };
+      }));
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [cityInfo]);
+
+  // 2. Dispatch routing responder vehicle
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !window.L || !dispatchedEmergency || !cityInfo) return;
+
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current);
+    }
+
+    const startPoint = [cityInfo.lat - 0.005, cityInfo.lng + 0.005];
+    const endPoint = [dispatchedEmergency.lat, dispatchedEmergency.lon];
+
+    const polyline = window.L.polyline([startPoint, endPoint], {
+      color: '#f43f5e',
+      weight: 4.5,
+      opacity: 0.9,
+      className: 'animate-dash'
+    }).addTo(map);
+
+    routeLineRef.current = polyline;
+    map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
+
+    let progress = 0;
+    const stepCount = 40;
+    const interval = setInterval(() => {
+      progress += 1;
+      const t = progress / stepCount;
+      const curLat = startPoint[0] + (endPoint[0] - startPoint[0]) * t;
+      const curLng = startPoint[1] + (endPoint[1] - startPoint[1]) * t;
+
+      setVehicles(prev => {
+        const idx = prev.findIndex(v => v.id === 'v-dispatched-unit');
+        const unit = {
+          id: 'v-dispatched-unit',
+          name: `Emergency Dispatcher (Responding to ${dispatchedEmergency.title})`,
+          type: 'dispatch',
+          lat: curLat,
+          lon: curLng,
+          color: '#f43f5e',
+          symbol: '🚒',
+          heading: 0
+        };
+
+        if (idx === -1) return [...prev, unit];
+        const updated = [...prev];
+        updated[idx] = unit;
+        return updated;
+      });
+
+      if (progress >= stepCount) {
+        clearInterval(interval);
+        setTimeout(() => {
+          if (routeLineRef.current && mapInstanceRef.current) {
+            mapInstanceRef.current.removeLayer(routeLineRef.current);
+            routeLineRef.current = null;
+          }
+          setVehicles(prev => prev.filter(v => v.id !== 'v-dispatched-unit'));
+          if (onClearDispatch) onClearDispatch();
+        }, 8000);
+      }
+    }, 120);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [dispatchedEmergency, cityInfo]);
 
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -320,8 +468,7 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
     if (mapInstanceRef.current) {
       updateMarkers(nodes, emergencyServices, bikepointsList);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, emergencyServices, activeLayers, bikepointsList, heatmapData]);
+  }, [nodes, emergencyServices, activeLayers, bikepointsList, heatmapData, vehicles]);
 
   const updateMarkers = (currentNodes, services, bikepoints) => {
     const map = mapInstanceRef.current;
@@ -523,6 +670,74 @@ export default function DigitalTwin({ onSelectNode, activeIncident, nodesList = 
         heatmarkersRef.current[district.district] = circle;
       });
     }
+
+    // 5. Add animated simulated vehicles
+    vehicles.forEach(veh => {
+      const iconHtml = `
+        <div style="
+          background-color: ${veh.color};
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 0 10px ${veh.color};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+        " class="animate-bounce-subtle">
+          ${veh.symbol}
+        </div>
+      `;
+
+      const customIcon = window.L.divIcon({
+        html: iconHtml,
+        className: 'custom-vehicle-marker',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+
+      const marker = window.L.marker([veh.lat, veh.lon], { icon: customIcon })
+        .addTo(map)
+        .on('click', () => {
+          setSelectedNode({
+            id: veh.id,
+            type: 'vehicle',
+            name: veh.name,
+            status: 'Moving',
+            metric: `GPS Active. Tracking municipal fleet unit.`,
+            lat: veh.lat,
+            lon: veh.lon,
+            color: veh.color
+          });
+        });
+
+      marker.bindPopup(`
+        <div class="map-marker-popup">
+          <strong style="color: ${veh.color}">${veh.name}</strong><br/>
+          <span style="font-size: 11px; color: #475569">Status: GPS Active | Tracking</span>
+        </div>
+      `);
+
+      markersRef.current[veh.id] = marker;
+    });
+
+    // 6. Add pulsing circle rings around critical/congested IoT nodes
+    currentNodes.forEach(node => {
+      if (!activeLayers[node.type]) return;
+      if (node.status === 'Congested' || node.status === 'Critical') {
+        const circle = window.L.circle([node.lat, node.lon], {
+          radius: 140, // in meters
+          color: node.color,
+          fillColor: node.color,
+          fillOpacity: 0.08,
+          weight: 1.5,
+          className: 'sensor-pulse-ring'
+        }).addTo(map);
+        
+        markersRef.current[`ring-${node.id}`] = circle;
+      }
+    });
   };
 
   const toggleLayer = (layer) => {

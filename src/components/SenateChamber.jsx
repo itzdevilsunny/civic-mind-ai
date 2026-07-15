@@ -23,6 +23,46 @@ export default function SenateChamber({ policyParams }) {
   const [activeSpeaker, setActiveSpeaker] = useState(null);
   const scrollRef = useRef(null);
 
+  const [voteCounts, setVoteCounts] = useState({ support: 18, oppose: 22 });
+  const [hasVoted, setHasVoted] = useState(false);
+
+  // Style injector for visual conference speak indicator voice-wave
+  useEffect(() => {
+    const styleId = 'senate-animation-styles';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        @keyframes voice-wave {
+          0%, 100% { height: 4px; }
+          50% { height: 14px; }
+        }
+        .animate-voice-wave {
+          animation: voice-wave 0.8s ease-in-out infinite;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
+
+  const handleVote = (voteType) => {
+    if (hasVoted) return;
+    setVoteCounts(prev => ({
+      ...prev,
+      [voteType]: prev[voteType] + 1
+    }));
+    setHasVoted(true);
+
+    const citizenMsg = {
+      agent: "Citizen Engagement Agent",
+      sentiment: voteType === 'support' ? 'supportive' : 'critical',
+      message: voteType === 'support'
+        ? `We have registered strong community support for this motion. Public feedback indicates confidence in the municipal team's direction.`
+        : `Urgent notice: The citizen vote is leaning negative. Residents are raising critical concerns about the immediate transit adjustments.`
+    };
+    setVisibleMessages(prev => [...prev, citizenMsg]);
+  };
+
   const fetchDebate = (paramsToUse) => {
     setLoading(true);
     setVisibleMessages([]);
@@ -111,6 +151,12 @@ export default function SenateChamber({ policyParams }) {
     }
   }, [visibleMessages, activeSpeaker]);
 
+  const COMMISSIONERS = [
+    { name: "Traffic Intelligence Agent", role: "Mobility Commissioner", avatar: "🚦", color: "from-emerald-500 to-teal-500" },
+    { name: "Energy Intelligence Agent", role: "Grid Commissioner", avatar: "⚡", color: "from-amber-500 to-orange-500" },
+    { name: "Public Safety Agent", role: "Safety Commissioner", avatar: "🛡️", color: "from-rose-500 to-pink-500" },
+  ];
+
   return (
     <div className="card h-full flex flex-col justify-between">
       <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex justify-between items-center">
@@ -135,6 +181,46 @@ export default function SenateChamber({ policyParams }) {
         </button>
       </div>
 
+      {/* Visual Conference Avatars Panel */}
+      <div className="grid grid-cols-3 gap-3 mb-4 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-100 dark:border-slate-800">
+        {COMMISSIONERS.map((comm, idx) => {
+          const isSpeaking = activeSpeaker === comm.name;
+          return (
+            <div 
+              key={idx} 
+              className={`flex flex-col items-center p-3 rounded-lg border transition-all duration-300 ${
+                isSpeaking 
+                  ? 'border-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/10 shadow-md scale-102' 
+                  : 'border-slate-150 dark:border-slate-800 bg-white dark:bg-slate-950'
+              }`}
+            >
+              <div className="relative">
+                <div className={`w-10 h-10 rounded-full bg-gradient-to-tr ${comm.color} flex items-center justify-center text-lg shadow-inner`}>
+                  {comm.avatar}
+                </div>
+                {isSpeaking && (
+                  <span className="absolute -bottom-1 -right-1 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-indigo-500 flex items-center justify-center text-[8px] text-white">🎙️</span>
+                  </span>
+                )}
+              </div>
+              <span className="text-[10px] font-bold mt-2 text-slate-800 dark:text-slate-205 text-center truncate w-full">{comm.role}</span>
+              <span className="text-[8px] text-slate-400 font-medium">{isSpeaking ? 'Speaking...' : 'Listening'}</span>
+              
+              {isSpeaking && (
+                <div className="flex items-center gap-0.5 mt-1.5 h-3">
+                  <div className="w-[2px] h-2 bg-indigo-500 rounded animate-voice-wave" style={{ animationDelay: '0.1s' }} />
+                  <div className="w-[2px] h-3 bg-indigo-500 rounded animate-voice-wave" style={{ animationDelay: '0.3s' }} />
+                  <div className="w-[2px] h-1 bg-indigo-500 rounded animate-voice-wave" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-[2px] h-3 bg-indigo-500 rounded animate-voice-wave" style={{ animationDelay: '0.4s' }} />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
       {/* Gavel & Topic Banner */}
       <div className="mb-4 bg-slate-50 dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl p-3 flex items-start gap-3">
         <MessageSquare className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" />
@@ -145,15 +231,15 @@ export default function SenateChamber({ policyParams }) {
       </div>
 
       {/* Debate scroll log */}
-      <div className="flex-1 min-h-[300px] max-h-[400px] overflow-y-auto pr-1 flex flex-col gap-3.5 mb-2">
+      <div className="flex-1 min-h-[220px] max-h-[300px] overflow-y-auto pr-1 flex flex-col gap-3 mb-2">
         {visibleMessages.filter(Boolean).map((msg, idx) => (
           <div 
             key={idx} 
-            className={`flex flex-col gap-1.5 border p-3 rounded-xl transition-all duration-300 animate-fade-in ${agentColors[msg.agent] || 'border-slate-200 bg-slate-50'}`}
+            className={`flex flex-col gap-1.5 border p-3 rounded-xl transition-all duration-300 animate-fade-in ${agentColors[msg.agent] || 'border-indigo-500/20 bg-indigo-50/5 text-indigo-600 dark:text-indigo-400 border-slate-200 bg-slate-50'}`}
           >
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-1.5 text-xs font-bold font-sans">
-                {agentIcons[msg.agent] || <MessageSquare className="w-3.5 h-3.5" />}
+                {agentIcons[msg.agent] || <MessageSquare className="w-3.5 h-3.5 animate-pulse text-indigo-500" />}
                 <span>{msg.agent}</span>
               </div>
               <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide border ${
@@ -197,6 +283,44 @@ export default function SenateChamber({ policyParams }) {
         
         {/* Scroll anchor */}
         <div ref={scrollRef} />
+      </div>
+
+      {/* Live Citizen Ballot Panel */}
+      <div className="mt-2 p-3 bg-indigo-50/20 dark:bg-indigo-950/10 border border-indigo-100/60 dark:border-indigo-900/30 rounded-xl">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-350 uppercase tracking-wider">Live Citizen Ballot</span>
+          <span className="text-[9px] font-bold text-slate-400">{hasVoted ? 'Ballot Cast' : 'Vote Required'}</span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleVote('support')}
+            disabled={hasVoted}
+            className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-between ${
+              hasVoted
+                ? 'bg-slate-100 border-slate-200 text-slate-450 dark:bg-slate-900 dark:border-slate-800'
+                : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-900/40 dark:hover:bg-emerald-900/30'
+            }`}
+          >
+            <span>👍 Support Policy</span>
+            <span className="text-[10px] bg-emerald-500/10 dark:bg-emerald-500/20 px-1.5 py-0.5 rounded font-mono">
+              {Math.round((voteCounts.support / (voteCounts.support + voteCounts.oppose)) * 100)}%
+            </span>
+          </button>
+          <button
+            onClick={() => handleVote('oppose')}
+            disabled={hasVoted}
+            className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-between ${
+              hasVoted
+                ? 'bg-slate-100 border-slate-200 text-slate-450 dark:bg-slate-900 dark:border-slate-800'
+                : 'bg-rose-50 border-rose-200 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/20 dark:border-rose-900/40 dark:hover:bg-rose-900/30'
+            }`}
+          >
+            <span>👎 Oppose Policy</span>
+            <span className="text-[10px] bg-rose-500/10 dark:bg-rose-500/20 px-1.5 py-0.5 rounded font-mono">
+              {Math.round((voteCounts.oppose / (voteCounts.support + voteCounts.oppose)) * 100)}%
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

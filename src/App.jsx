@@ -28,7 +28,8 @@ import {
   Heart,
   Leaf,
   Trash2,
-  HardHat
+  HardHat,
+  X
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 
@@ -135,6 +136,8 @@ export default function App() {
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [activeIncident, setActiveIncident] = useState(null);
   const [isBackendOnline, setIsBackendOnline] = useState(false);
+  const [activeToast, setActiveToast] = useState(null);
+  const [dispatchedEmergency, setDispatchedEmergency] = useState(null);
   
   // City & Language state
   const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('civicmind_city') || 'mumbai');
@@ -372,19 +375,20 @@ export default function App() {
     const { lat, lng, tz } = cityInfo;
     const geoQ = `lat=${lat}&lng=${lng}&tz=${encodeURIComponent(tz)}`;
     const geoQ2 = `lat=${lat}&lng=${lng}`;
+    const hj = r => { if (!r.ok) throw new Error(); return r.json(); };
     Promise.all([
-      fetch(`/api/live/weather?${geoQ}`).then(res => res.json()).catch(() => null),
-      fetch(`/api/live/aqi?${geoQ2}`).then(res => res.json()).catch(() => null),
-      fetch(`/api/live/transport?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => []),
-      fetch(`/api/live/market`).then(res => res.json()).catch(() => null),
-      fetch(`/api/live/news?city=${encodeURIComponent(cityInfo.label)}`).then(res => res.json()).catch(() => []),
-      fetch('/api/tickets').then(res => res.json()).catch(() => null),
-      fetch(`/api/telemetry?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => []),
-      fetch('/api/actions').then(res => res.json()).catch(() => []),
-      fetch(`/api/live/aqi/forecast?${geoQ2}`).then(res => res.json()).catch(() => null),
-      fetch(`/api/live/bikepoints?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => null),
-      fetch('/api/sustainability/metrics').then(res => res.json()).catch(() => null),
-      fetch('/api/proposals').then(res => res.json()).catch(() => [])
+      fetch(`/api/live/weather?${geoQ}`).then(hj).catch(() => null),
+      fetch(`/api/live/aqi?${geoQ2}`).then(hj).catch(() => null),
+      fetch(`/api/live/transport?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(hj).catch(() => []),
+      fetch(`/api/live/market`).then(hj).catch(() => null),
+      fetch(`/api/live/news?city=${encodeURIComponent(cityInfo.label)}`).then(hj).catch(() => []),
+      fetch('/api/tickets').then(hj).catch(() => null),
+      fetch(`/api/telemetry?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(hj).catch(() => []),
+      fetch('/api/actions').then(hj).catch(() => []),
+      fetch(`/api/live/aqi/forecast?${geoQ2}`).then(hj).catch(() => null),
+      fetch(`/api/live/bikepoints?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(hj).catch(() => null),
+      fetch('/api/sustainability/metrics').then(hj).catch(() => null),
+      fetch('/api/proposals').then(hj).catch(() => [])
     ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData, proposalsData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
@@ -469,6 +473,103 @@ export default function App() {
       root.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  // Live SSE Emergencies listener
+  useEffect(() => {
+    if (!cityInfo) return;
+    const sseUrl = `/api/live/emergencies?city=${encodeURIComponent(cityInfo.label)}&lat=${cityInfo.lat}&lng=${cityInfo.lng}`;
+    const eventSource = new EventSource(sseUrl);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed.type === 'EMERGENCY') {
+          const evt = parsed.event;
+          
+          // 1. Add to alerts list
+          setAlerts(prev => [
+            {
+              id: evt.id,
+              type: 'safety',
+              title: evt.title,
+              body: evt.description,
+              ts: Date.now(),
+              read: false,
+              lat: evt.lat,
+              lon: evt.lon
+            },
+            ...prev
+          ]);
+
+          // 2. Set active slide-in toast
+          setActiveToast(evt);
+
+          // 3. Play chime
+          const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav");
+          audio.volume = 0.4;
+          audio.play().catch(() => {});
+
+          // 4. Voice Speech Synthesis
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(`Warning. New emergency alert. ${evt.title.replace(/[^\w\s]/g, '')}. ${evt.description}`);
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+          }
+
+          // 5. Add to system logs
+          setSystemLogs(prev => [`Emergency Alert: ${evt.title} - ${evt.description}`, ...prev]);
+        }
+      } catch (e) {
+        console.error("Failed to parse SSE event:", e);
+      }
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [selectedCity, cityInfo]);
+
+  useEffect(() => {
+    if (activeToast) {
+      const timer = setTimeout(() => {
+        setActiveToast(null);
+      }, 12000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeToast]);
+
+  const handleEmergencyDispatch = (evt) => {
+    fetch('/api/emergency/dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        event_id: evt.id,
+        action_name: `Emergency Dispatch - ${evt.title}`,
+        impact: `Dispatched response unit to resolve the reported issue at coordinate: ${evt.lat.toFixed(4)}, ${evt.lon.toFixed(4)}.`
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setSystemLogs(prev => [`System: Dispatched emergency response unit to ${evt.title}.`, ...prev]);
+          loadLiveData();
+          setDispatchedEmergency({ lat: evt.lat, lon: evt.lon, title: evt.title });
+        }
+      })
+      .catch(err => console.error("Failed to trigger dispatch:", err));
+  };
+
+  const handleVoiceCommand = (cmd) => {
+    if (cmd.type === 'CHANGE_CITY') {
+      setSelectedCity(cmd.value);
+      localStorage.setItem('civicmind_city', cmd.value);
+    } else if (cmd.type === 'CHANGE_TAB') {
+      setActiveTab(cmd.value);
+    } else if (cmd.type === 'SET_DARK_MODE') {
+      setIsDarkMode(cmd.value);
+    }
+  };
 
   // Generate alerts from live telemetry
   useEffect(() => {
@@ -590,6 +691,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: userText })
       });
+      if (!res.ok) throw new Error('API Error');
       const parsed = await res.json();
       setDraftedTicket(parsed);
       
@@ -1344,6 +1446,8 @@ export default function App() {
                   bikepointsList={bikepoints.stations || []}
                   onEmergencyDispatch={loadLiveData}
                   cityInfo={cityInfo}
+                  dispatchedEmergency={dispatchedEmergency}
+                  onClearDispatch={() => setDispatchedEmergency(null)}
                   onSelectNode={(node) => {
                     if (node.action === 'dispatch') {
                       setSystemLogs(prev => [`Safety Agent: [Emergency Command] Field dispatch team deployed to: ${node.name}`, ...prev]);
@@ -2220,7 +2324,44 @@ export default function App() {
         tickets={tickets}
         sustainability={sustainability}
         liveTransport={liveTransport}
+        onVoiceCommand={handleVoiceCommand}
       />
+
+      {/* Real-time Emergency Toast */}
+      {activeToast && (
+        <div className="fixed bottom-6 right-6 z-[9999] max-w-sm bg-slate-900 border border-rose-500/50 rounded-xl p-4 shadow-2xl text-white transform transition-all duration-300 translate-y-0 animate-bounce-subtle">
+          <div className="flex justify-between items-start gap-3">
+            <div className="flex gap-2.5 items-center">
+              <span className="p-1.5 bg-rose-500/20 text-rose-400 rounded-lg text-lg animate-pulse">⚠️</span>
+              <div>
+                <h4 className="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Live City Emergency</h4>
+                <h3 className="text-xs font-extrabold">{activeToast.title}</h3>
+              </div>
+            </div>
+            <button onClick={() => setActiveToast(null)} className="text-slate-400 hover:text-white transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="mt-2 text-[11px] text-slate-300 leading-relaxed">{activeToast.description}</p>
+          <div className="mt-3 flex gap-2 justify-end">
+            <button
+              onClick={() => setActiveToast(null)}
+              className="text-[10px] px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 rounded border border-slate-700 transition-colors"
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={() => {
+                handleEmergencyDispatch(activeToast);
+                setActiveToast(null);
+              }}
+              className="text-[10px] px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold transition-all border border-rose-500"
+            >
+              Dispatch Unit
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

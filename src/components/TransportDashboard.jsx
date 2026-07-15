@@ -73,6 +73,7 @@ export default function TransportDashboard({ city, cityInfo, liveTransport, live
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch(`/api/transport/dashboard?city=${encodeURIComponent(city || 'Mumbai')}`);
+      if (!res.ok) throw new Error('API Error');
       const json = await res.json();
       setData(json);
       buildCrossAlerts(json);

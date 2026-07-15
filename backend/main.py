@@ -37,10 +37,12 @@ else:
 
 # Try to initialize Gemini Generative AI
 gemini_available = False
+gemini_model = None
 if GEMINI_API_KEY and "your-google-gemini" not in GEMINI_API_KEY:
     try:
         import google.generativeai as genai
         genai.configure(api_key=GEMINI_API_KEY)
+        gemini_model = genai.GenerativeModel("gemini-2.5-flash")
         gemini_available = True
         logger.info("Gemini generative AI SDK initialized successfully.")
     except Exception as e:
@@ -4688,6 +4690,90 @@ Be specific, data-driven, and actionable. Format as numbered bullets with bold h
         )
 
     return {"city": city, "advice": advice}
+
+
+@app.get("/api/live/emergencies")
+async def get_live_emergencies(request: Request, city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
+    """
+    Periodically streams simulated real-time emergency events for the city
+    using Server-Sent Events.
+    """
+    import random, asyncio
+    
+    EMERGENCY_TYPES = [
+        {"title": "Water Main Burst", "category": "Utilities & Lighting", "priority": "High", "desc": "Water main pipe rupture causing water pooling and pressure drop in Sector 4.", "icon": "💧"},
+        {"title": "Major Pothole Reported", "category": "Roads & Bridges", "priority": "Medium", "desc": "Deep pothole forming in the middle lane causing traffic hazard.", "icon": "🏗️"},
+        {"title": "Power Line Down", "category": "Utilities & Lighting", "priority": "Critical", "desc": "High-voltage cable snapped and blocking traffic on Outer Ring Road.", "icon": "⚡"},
+        {"title": "Hazardous Waste Spill", "category": "Environmental", "priority": "High", "desc": "Illegal industrial sludge dumping reported near Central Park exit.", "icon": "🚨"},
+        {"title": "Traffic Gridlock at Intersection", "category": "Transport", "priority": "Medium", "desc": "Signal synchronization failure leading to 2km backlog of vehicles.", "icon": "🚦"},
+        {"title": "Hospital Capacity Alert", "category": "Social Services", "priority": "High", "desc": "Local ICU occupancy exceeding 95% due to seasonal surge.", "icon": "🏥"},
+    ]
+
+    async def event_generator():
+        # Yield initial message
+        yield json.dumps({"type": "INIT", "message": "Connected to CivicMind Real-time Incident Channel."})
+        
+        while True:
+            if await request.is_disconnected():
+                break
+                
+            # Wait between 15 to 25 seconds for each new event
+            await asyncio.sleep(random.uniform(15.0, 25.0))
+            
+            # Select random emergency type
+            evt = random.choice(EMERGENCY_TYPES)
+            
+            # Slightly offset coordinates near the city centre
+            dlat = random.uniform(-0.015, 0.015)
+            dlng = random.uniform(-0.015, 0.015)
+            
+            event_id = f"EVT-{random.randint(1000, 9999)}"
+            data = {
+                "id": event_id,
+                "title": f"{evt['icon']} {evt['title']}",
+                "category": evt["category"],
+                "priority": evt["priority"],
+                "description": evt["desc"],
+                "lat": lat + dlat,
+                "lon": lng + dlng,
+                "status": "Alert Received",
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            yield json.dumps({"type": "EMERGENCY", "event": data})
+            
+    async def sse_wrapper():
+        async for item in event_generator():
+            yield {"data": item}
+            
+    return EventSourceResponse(sse_wrapper())
+
+
+class DispatchRequest(BaseModel):
+    event_id: str
+    action_name: str
+    impact: str
+
+
+@app.post("/api/emergency/dispatch")
+def post_emergency_dispatch(req: DispatchRequest):
+    """
+    Triggers dispatch of municipal workers to resolve an emergency,
+    logging it into the action_history database table.
+    """
+    conn = sqlite3.connect(SQLITE_PATH)
+    cursor = conn.cursor()
+    try:
+        # Insert into action_history
+        cursor.execute(
+            "INSERT INTO action_history (id, action_name, impact, stage, status) VALUES (?, ?, ?, ?, ?)",
+            (req.event_id, req.action_name, req.impact, 2, "Dispatched")
+        )
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": f"Dispatch successfully triggered for incident {req.event_id}"}
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":

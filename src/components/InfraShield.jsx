@@ -37,6 +37,7 @@ export default function InfraShield({ city, lat, lng }) {
   const fetchData = async () => {
     try {
       const res = await fetch(`/api/infra/telemetry?city=${encodeURIComponent(city || 'Mumbai')}&lat=${lat}&lng=${lng}`);
+      if (!res.ok) throw new Error('API Error');
       const json = await res.json();
       setData(json);
     } catch {

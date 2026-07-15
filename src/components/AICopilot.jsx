@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Send, BrainCircuit, Loader2, ChevronDown, ChevronRight, X, ShieldAlert, Award, FileSpreadsheet } from 'lucide-react';
+import { Bot, Send, BrainCircuit, Loader2, ChevronDown, ChevronRight, X, ShieldAlert, Award, FileSpreadsheet, Mic, MicOff } from 'lucide-react';
 
 
 
@@ -11,7 +11,8 @@ export default function AICopilot({
   liveAqi, 
   tickets = [], 
   sustainability, 
-  liveTransport 
+  liveTransport,
+  onVoiceCommand
 }) {
   const [messages, setMessages] = useState([
     {
@@ -27,6 +28,8 @@ export default function AICopilot({
   const [input, setInput] = useState('');
   const [activeThoughts, setActiveThoughts] = useState('');
   const [expandedThoughts, setExpandedThoughts] = useState({});
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
@@ -36,6 +39,113 @@ export default function AICopilot({
 
   const toggleThoughts = (idx) => {
     setExpandedThoughts(prev => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  useEffect(() => {
+    if (!isOpen && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }, [isOpen]);
+
+  const speakText = (text) => {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*#`_\-]/g, '').trim();
+    if (!cleanText) return;
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+      return;
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+
+    rec.onstart = () => setIsListening(true);
+    rec.onerror = (e) => {
+      console.error(e);
+      setIsListening(false);
+    };
+    rec.onend = () => setIsListening(false);
+    rec.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setInput(transcript);
+      handleSpeechCommand(transcript);
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
+  const handleSpeechCommand = (text) => {
+    const cleanText = text.toLowerCase().trim();
+    
+    // 1. Switch City
+    if (cleanText.includes("switch to") || cleanText.includes("change city to")) {
+      const cities = ["mumbai", "delhi", "bengaluru", "chennai", "hyderabad", "kolkata", "pune", "ahmedabad", "jaipur", "lucknow", "surat", "indore"];
+      for (const city of cities) {
+        if (cleanText.includes(city)) {
+          if (onVoiceCommand) onVoiceCommand({ type: 'CHANGE_CITY', value: city });
+          speakText(`Switching dashboard to ${city}`);
+          return;
+        }
+      }
+    }
+    
+    // 2. Switch Tab
+    if (cleanText.includes("show") || cleanText.includes("go to") || cleanText.includes("navigate to")) {
+      const tabs = {
+        "overview": "overview", "transport": "transportations", "traffic": "traffic",
+        "weather": "weather", "safety": "safety", "solar": "urjagrid", "water": "waterwatch",
+        "health": "healthwatch", "transit eco": "transiteco", "waste": "wastenet",
+        "roads": "infrashield", "infrastructure": "infrashield", "news": "news",
+        "pulse": "pulse", "budget": "budget", "proposal": "proposals", "maintenance": "maintenance"
+      };
+      for (const [key, val] of Object.entries(tabs)) {
+        if (cleanText.includes(key)) {
+          if (onVoiceCommand) onVoiceCommand({ type: 'CHANGE_TAB', value: val });
+          speakText(`Opening ${key} tab`);
+          return;
+        }
+      }
+    }
+    
+    // 3. Theme Toggle
+    if (cleanText.includes("enable dark mode") || cleanText.includes("dark mode")) {
+      if (onVoiceCommand) onVoiceCommand({ type: 'SET_DARK_MODE', value: true });
+      speakText("Enabling dark theme");
+      return;
+    }
+    if (cleanText.includes("enable light mode") || cleanText.includes("light mode")) {
+      if (onVoiceCommand) onVoiceCommand({ type: 'SET_DARK_MODE', value: false });
+      speakText("Enabling light theme");
+      return;
+    }
+    
+    // 4. General Issue Report
+    if (cleanText.startsWith("report ")) {
+      const issue = text.substring(7);
+      handleSend(issue);
+      return;
+    }
+    
+    // Default: Send general question
+    handleSend(text);
   };
 
   const handleSend = async (text) => {
@@ -128,6 +238,7 @@ export default function AICopilot({
           }
         }
       }
+      speakText(contentText);
     } catch (err) {
       console.warn("SSE fetch failed, falling back to local simulation:", err);
       simulateLocalResponse(query);
@@ -238,6 +349,7 @@ Ask me about: **traffic, air quality, citizen complaints, or budgets** to run sm
             }
           ]);
           setActiveThoughts('');
+          speakText(content);
         }, 100);
       }
     }, 20);
@@ -455,6 +567,20 @@ Ask me about: **traffic, air quality, citizen complaints, or budgets** to run sm
           className="form-input flex-1 text-xs"
           disabled={isTyping}
         />
+        <button
+          onClick={toggleListening}
+          className={`btn-3d ${isListening ? 'bg-rose-600 hover:bg-rose-700 text-white animate-pulse' : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`}
+          style={{ transform: 'translateY(-2px)', padding: '0.6rem 1rem', boxShadow: isListening ? '0 3px 0 #991b1b' : '0 3px 0 rgba(0,0,0,0.15)' }}
+          title={isListening ? "Listening... Click to stop" : "Use Voice Commands"}
+        >
+          {isListening ? (
+            <span className="flex items-center gap-1 font-bold text-[10px]">
+              <Mic className="w-4 h-4 text-white" />
+            </span>
+          ) : (
+            <Mic className="w-4 h-4" />
+          )}
+        </button>
         <button
           onClick={() => handleSend(input)}
           disabled={isTyping || !input.trim()}
