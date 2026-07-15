@@ -4255,19 +4255,29 @@ MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov
 @app.get("/api/waste/telemetry")
 def get_waste_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 72.87):
     import random, math
-    city_key = city.lower().replace(" ", "")
+    city_key = get_city_baseline_key(city)
     base = CITY_WASTE_BASELINES.get(city_key, DEFAULT_WASTE)
+
+    # Query database for actual waste/sanitation complaints to generate alerts
+    try:
+        tickets = db_get_tickets()
+        active_waste_tickets = [t for t in tickets if t.get("category") == "Sanitation & Waste" and t.get("status") != "Resolved"]
+    except:
+        active_waste_tickets = []
 
     def jitter(v, pct=8):
         return round(v * (1 + (random.random() - 0.5) * pct / 100))
 
     zones = []
     for i, zone_name in enumerate(ZONE_NAMES):
+        matching_tickets = [t for t in active_waste_tickets if zone_name.lower() in t.get("description", "").lower() or zone_name.lower() in t.get("title", "").lower()]
+        pickups = len(matching_tickets) * 3 + random.randint(1, 5)
+        
         zones.append({
             "zone": zone_name,
             "trucks": random.randint(4, 12),
             "ot_pct": min(100, jitter(base["recycling_pct"] + 20 - i * 2, 5)),
-            "pending_pickups": random.randint(0, 14),
+            "pending_pickups": pickups,
             "distance_km": round((8 + i * 3.5) * 10) / 10,
             "emissions_kg": round((base["daily_tpd"] / base["zones_count"]) * 0.04 * 10) / 10
         })
@@ -4285,11 +4295,23 @@ def get_waste_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 7
         diverted  = jitter(collected * base["diversion_pct"] // 100)
         monthly.append({"month": m, "collected": collected, "recycled": recycled, "diverted": diverted})
 
-    alerts = [
-        {"zone": "Zone C (East)", "severity": "high",   "msg": f"Overflow risk at Transfer Station 7 — {base['landfill_cap']+16}% capacity"},
-        {"zone": "Zone F (Suburban)", "severity": "medium", "msg": "Route delay: 3 vehicles off-schedule by >45 min"},
-        {"zone": "Zone A (North)", "severity": "low",   "msg": f"Recycling compliance below target ({base['recycling_pct']-12}% vs 70% goal)"},
-    ]
+    # Dynamic alerts driven by actual complaints database
+    alerts = []
+    if active_waste_tickets:
+        for idx, t in enumerate(active_waste_tickets[:3]):
+            zone = ZONE_NAMES[hash(t["id"]) % len(ZONE_NAMES)]
+            alerts.append({
+                "zone": zone,
+                "severity": "high" if t["priority"] in ["High", "Critical"] else "medium",
+                "msg": f"ACTIVE COMPLAINT: {t['title']} — dispatching cleanup unit to {zone}"
+            })
+    
+    if not alerts:
+        alerts = [
+            {"zone": "Zone C (East)", "severity": "high",   "msg": f"Overflow risk at Transfer Station 7 — {base['landfill_cap']+10}% capacity"},
+            {"zone": "Zone F (Suburban)", "severity": "medium", "msg": "Route delay: 3 vehicles off-schedule by >45 min"},
+        ]
+        
     if base["landfill_cap"] >= 80:
         alerts.insert(0, {"zone": "Landfill Site", "severity": "high", "msg": f"CRITICAL: Landfill at {base['landfill_cap']}% — activate emergency diversion protocols immediately"})
 
@@ -4384,16 +4406,32 @@ CONTRACTORS = ["L&T Infrastructure", "Shapoorji Pallonji", "NCC Ltd", "Dilip Bui
 @app.get("/api/infra/telemetry")
 def get_infra_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 72.87):
     import random
-    city_key = city.lower().replace(" ", "")
+    city_key = get_city_baseline_key(city)
     base = CITY_INFRA_BASELINES.get(city_key, DEFAULT_INFRA_B)
+
+    precip_sum = 0.0
+    temp = 25.0
+    try:
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}&current=temperature_2m&daily=precipitation_sum&timezone=auto"
+        res = requests.get(url, timeout=5)
+        if res.status_code == 200:
+            data = res.json()
+            temp = data.get("current", {}).get("temperature_2m", 25.0)
+            daily = data.get("daily", {})
+            precip_sum = sum(daily.get("precipitation_sum", [0.0])) if daily.get("precipitation_sum") else 0.0
+    except Exception as e:
+        logger.error(f"Error fetching weather for infra telemetry: {e}")
 
     def jitter(v, pct=10):
         return round(v * (1 + (random.random() - 0.5) * pct / 100))
 
+    precip_pothole_multiplier = 1.0 + (precip_sum / 15.0)
+    potholes_count = int(base["potholes"] * precip_pothole_multiplier)
+
     wards = []
     for i, w in enumerate(INFRA_WARDS):
-        pot = jitter(round(base["potholes"] / 8) + (i % 3) * 120)
-        rc = max(10, min(95, jitter(base["infra_score"] + (i % 4 - 2) * 8)))
+        pot = jitter(round(potholes_count / 8) + (i % 3) * 120)
+        rc = max(10, min(95, jitter(base["infra_score"] + (i % 4 - 2) * 8 - int(precip_sum * 0.4))))
         wards.append({
             "name": w,
             "potholes": pot,
@@ -4405,7 +4443,8 @@ def get_infra_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 7
     bridge_types = ["Overbridge", "Flyover", "ROB", "Viaduct", "Cable-Stay", "Arch Bridge", "PSC Bridge", "Culvert"]
     bridges_list = []
     for i, bt in enumerate(bridge_types):
-        score = round(40 + random.random() * 55)
+        temp_stress = max(0, temp - 32) * 0.8
+        score = max(20, min(98, round(base["infra_score"] + 15 + random.random() * 15 - temp_stress)))
         si = 0 if score >= 85 else (1 if score >= 70 else (2 if score >= 55 else (3 if score >= 40 else 4)))
         bridges_list.append({
             "name": f"{bt} {chr(65+i)}",
@@ -4413,7 +4452,7 @@ def get_infra_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 7
             "health_score": score,
             "status": BRIDGE_STATUSES_B[si],
             "last_inspected": f"{random.randint(1,12)} months ago",
-            "load_factor": round(75 + random.random() * 25),
+            "load_factor": round(75 + random.random() * 25 + max(0, temp - 32) * 0.4),
             "action": "Immediate Closure Risk" if si >= 4 else ("Schedule Retrofit" if si >= 2 else "Routine Monitoring")
         })
 
@@ -4432,15 +4471,15 @@ def get_infra_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 7
     months = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"]
     monthly_potholes = []
     for m in months:
-        reported = jitter(round(base["potholes"] / 12))
-        repaired = jitter(round(base["potholes"] / 15))
-        pending = jitter(round(base["potholes"] / 25))
+        reported = jitter(round(potholes_count / 12))
+        repaired = jitter(round(potholes_count / 15))
+        pending = jitter(round(potholes_count / 25))
         monthly_potholes.append({"month": m, "reported": reported, "repaired": repaired, "pending": pending})
 
     return {
         "city": city,
         "roads_km": base["roads_km"],
-        "potholes": base["potholes"],
+        "potholes": potholes_count,
         "bridges": base["bridges"],
         "avg_road_age": base["avg_road_age"],
         "repair_budget_cr": base["repair_budget_cr"],
@@ -4452,7 +4491,6 @@ def get_infra_telemetry(city: str = "Mumbai", lat: float = 19.07, lng: float = 7
         "active_projects": active_projects,
         "monthly_potholes": monthly_potholes
     }
-
 
 class InfraRequest(BaseModel):
     city: str = "Mumbai"
