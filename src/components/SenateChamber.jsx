@@ -25,6 +25,7 @@ export default function SenateChamber({ policyParams }) {
 
   const [voteCounts, setVoteCounts] = useState({ support: 18, oppose: 22 });
   const [hasVoted, setHasVoted] = useState(false);
+  const [isSpeakingAudio, setIsSpeakingAudio] = useState(false);
 
   // Style injector for visual conference speak indicator voice-wave
   useEffect(() => {
@@ -105,7 +106,7 @@ export default function SenateChamber({ policyParams }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [policyParams]);
 
-  // Handle sequential message reveal
+  // Handle sequential message reveal and speech playbacks
   useEffect(() => {
     if (!messages || messages.length === 0) return;
 
@@ -123,17 +124,59 @@ export default function SenateChamber({ policyParams }) {
         const speaker = currentMsg.agent;
         setActiveSpeaker(speaker);
 
-        setTimeout(() => {
-          if (isCancelled) return;
-          const msgToAppend = messages[index];
-          if (msgToAppend) {
-            setVisibleMessages(prev => [...prev, msgToAppend]);
-          }
-          setActiveSpeaker(null);
-          index++;
+        if (isSpeakingAudio && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          const cleanText = currentMsg.message.replace(/[^\w\s\.,!\?]/g, '');
+          const utterance = new SpeechSynthesisUtterance(cleanText);
           
-          setTimeout(showNextMessage, 1000);
-        }, 1800);
+          if (speaker === "Traffic Intelligence Agent") {
+            utterance.pitch = 1.15;
+            utterance.rate = 1.1;
+          } else if (speaker === "Energy Intelligence Agent") {
+            utterance.pitch = 0.9;
+            utterance.rate = 0.95;
+          } else if (speaker === "Public Safety Agent") {
+            utterance.pitch = 0.75;
+            utterance.rate = 1.0;
+          } else if (speaker === "Citizen Engagement Agent") {
+            utterance.pitch = 1.0;
+            utterance.rate = 1.05;
+          }
+          
+          utterance.onend = () => {
+            if (isCancelled) return;
+            setVisibleMessages(prev => [...prev, currentMsg]);
+            setActiveSpeaker(null);
+            index++;
+            setTimeout(showNextMessage, 1000);
+          };
+          
+          utterance.onerror = () => {
+            if (isCancelled) return;
+            setVisibleMessages(prev => [...prev, currentMsg]);
+            setActiveSpeaker(null);
+            index++;
+            setTimeout(showNextMessage, 1000);
+          };
+          
+          window.speechSynthesis.speak(utterance);
+        } else {
+          // Standard silent mode with timeout reveal
+          setTimeout(() => {
+            if (isCancelled) return;
+            const msgToAppend = messages[index];
+            if (msgToAppend) {
+              setVisibleMessages(prev => [...prev, msgToAppend]);
+            }
+            setActiveSpeaker(null);
+            index++;
+            
+            setTimeout(showNextMessage, 1000);
+          }, 1800);
+        }
+      } else {
+        // Finished all messages, turn off speaking toggle
+        setIsSpeakingAudio(false);
       }
     };
 
@@ -141,8 +184,11 @@ export default function SenateChamber({ policyParams }) {
     
     return () => {
       isCancelled = true;
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
     };
-  }, [messages]);
+  }, [messages, isSpeakingAudio]);
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -166,19 +212,42 @@ export default function SenateChamber({ policyParams }) {
           </h3>
           <span className="card-subtitle">AI Agents debating urban planning and policy configurations</span>
         </div>
-        <button
-          onClick={() => fetchDebate()}
-          disabled={loading || activeSpeaker !== null}
-          className="btn-3d btn-primary flex items-center gap-1.5 text-xs py-1.5 px-3"
-          style={{ cursor: 'pointer' }}
-        >
-          {loading ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          ) : (
-            <Play className="w-3 h-3" />
+        <div className="flex items-center gap-2">
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                if (isSpeakingAudio) {
+                  if (window.speechSynthesis) window.speechSynthesis.cancel();
+                  setIsSpeakingAudio(false);
+                } else {
+                  // Clear visible messages so it restarts sequentially with voice
+                  setVisibleMessages([]);
+                  setIsSpeakingAudio(true);
+                }
+              }}
+              className={`btn-3d flex items-center gap-1 text-xs py-1.5 px-3 ${
+                isSpeakingAudio ? 'btn-danger' : 'btn-secondary'
+              }`}
+              style={{ cursor: 'pointer' }}
+            >
+              <span>{isSpeakingAudio ? "⏹️ Stop Audio" : "🔊 Listen Live"}</span>
+            </button>
           )}
-          <span>{loading ? "Convening..." : "Convene Senate"}</span>
-        </button>
+
+          <button
+            onClick={() => fetchDebate()}
+            disabled={loading || activeSpeaker !== null}
+            className="btn-3d btn-primary flex items-center gap-1.5 text-xs py-1.5 px-3"
+            style={{ cursor: 'pointer' }}
+          >
+            {loading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Play className="w-3 h-3" />
+            )}
+            <span>{loading ? "Convening..." : "Convene Senate"}</span>
+          </button>
+        </div>
       </div>
 
       {/* Visual Conference Avatars Panel */}
