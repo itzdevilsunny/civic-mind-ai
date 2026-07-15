@@ -32,3 +32,6 @@ __pycache__/
 *.pyc
 .snapshots/
 *.db
+
+.vercel
+.env*

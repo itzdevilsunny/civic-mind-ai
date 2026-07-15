@@ -487,38 +487,44 @@ export default function App() {
           const evt = parsed.event;
           
           // 1. Add to alerts list
-          setAlerts(prev => [
-            {
-              id: evt.id,
-              type: 'safety',
-              title: evt.title,
-              body: evt.description,
-              ts: Date.now(),
-              read: false,
-              lat: evt.lat,
-              lon: evt.lon
-            },
-            ...prev
-          ]);
+          setAlerts(prev => {
+            if (prev.some(a => a.id === evt.id)) return prev;
+            return [
+              {
+                id: evt.id,
+                type: 'safety',
+                title: evt.title,
+                body: evt.description,
+                ts: Date.now(),
+                read: false,
+                lat: evt.lat,
+                lon: evt.lon
+              },
+              ...prev
+            ];
+          });
 
-          // 2. Set active slide-in toast
-          setActiveToast(evt);
+          // Only play chime, show toast, and speak for new live updates
+          if (evt.is_new !== false) {
+            // 2. Set active slide-in toast
+            setActiveToast(evt);
 
-          // 3. Play chime
-          const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav");
-          audio.volume = 0.4;
-          audio.play().catch(() => {});
+            // 3. Play chime
+            const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-500.wav");
+            audio.volume = 0.4;
+            audio.play().catch(() => {});
 
-          // 4. Voice Speech Synthesis
-          if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(`Warning. New emergency alert. ${evt.title.replace(/[^\w\s]/g, '')}. ${evt.description}`);
-            utterance.rate = 1.0;
-            window.speechSynthesis.speak(utterance);
+            // 4. Voice Speech Synthesis
+            if (window.speechSynthesis) {
+              window.speechSynthesis.cancel();
+              const utterance = new SpeechSynthesisUtterance(`Warning. New emergency alert. ${evt.title.replace(/[^\w\s]/g, '')}. ${evt.description}`);
+              utterance.rate = 1.0;
+              window.speechSynthesis.speak(utterance);
+            }
+
+            // 5. Add to system logs
+            setSystemLogs(prev => [`Emergency Alert: ${evt.title} - ${evt.description}`, ...prev]);
           }
-
-          // 5. Add to system logs
-          setSystemLogs(prev => [`Emergency Alert: ${evt.title} - ${evt.description}`, ...prev]);
         }
       } catch (e) {
         console.error("Failed to parse SSE event:", e);

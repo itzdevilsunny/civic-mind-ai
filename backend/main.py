@@ -4692,91 +4692,89 @@ Be specific, data-driven, and actionable. Format as numbered bullets with bold h
     return {"city": city, "advice": advice}
 
 
+emergency_queues = []
+
 @app.get("/api/live/emergencies")
 async def get_live_emergencies(request: Request, city: str = "Mumbai", lat: float = 19.076, lng: float = 72.8777):
     """
-    Periodically streams simulated real-time emergency events for the city
-    using Server-Sent Events.
+    Streams actual real-time tickets from the database. On initial connection,
+    streams existing active tickets.
     """
-    import random, asyncio
+    import asyncio
+    queue = asyncio.Queue()
+    emergency_queues.append(queue)
     
-    EMERGENCY_TYPES = [
-        {"title": "Water Main Burst", "category": "Utilities & Lighting", "priority": "High", "desc": "Water main pipe rupture causing water pooling and pressure drop in Sector 4.", "icon": "💧"},
-        {"title": "Major Pothole Reported", "category": "Roads & Bridges", "priority": "Medium", "desc": "Deep pothole forming in the middle lane causing traffic hazard.", "icon": "🏗️"},
-        {"title": "Power Line Down", "category": "Utilities & Lighting", "priority": "Critical", "desc": "High-voltage cable snapped and blocking traffic on Outer Ring Road.", "icon": "⚡"},
-        {"title": "Hazardous Waste Spill", "category": "Environmental", "priority": "High", "desc": "Illegal industrial sludge dumping reported near Central Park exit.", "icon": "🚨"},
-        {"title": "Traffic Gridlock at Intersection", "category": "Transport", "priority": "Medium", "desc": "Signal synchronization failure leading to 2km backlog of vehicles.", "icon": "🚦"},
-        {"title": "Hospital Capacity Alert", "category": "Social Services", "priority": "High", "desc": "Local ICU occupancy exceeding 95% due to seasonal surge.", "icon": "🏥"},
-    ]
-
     async def event_generator():
         # Yield initial message
         yield json.dumps({"type": "INIT", "message": "Connected to CivicMind Real-time Incident Channel."})
         
+        # Query active tickets and yield them immediately as existing incidents
+        try:
+            tickets = db_get_tickets()
+            active_tickets = [t for t in tickets if t.get("status") in ["Submission Received", "Assigned", "In Progress"]]
+            for ticket in active_tickets:
+                h = hash(ticket["id"])
+                dlat = ((h % 100) - 50) / 3500.0
+                dlng = (((h // 100) % 100) - 50) / 3500.0
+                
+                event_data = {
+                    "id": ticket["id"],
+                    "title": f"🚨 {ticket['title']}",
+                    "category": ticket["category"],
+                    "priority": ticket["priority"],
+                    "description": ticket["description"],
+                    "lat": lat + dlat,
+                    "lon": lng + dlng,
+                    "status": ticket["status"],
+                    "timestamp": ticket.get("submitted_at"),
+                    "is_new": False
+                }
+                yield json.dumps({"type": "EMERGENCY", "event": event_data})
+        except Exception as e:
+            logger.error(f"Error fetching initial active tickets for SSE: {e}")
+            
         while True:
             if await request.is_disconnected():
                 break
+            try:
+                # Wait for new ticket event from the queue
+                ticket = await asyncio.wait_for(queue.get(), timeout=2.0)
                 
-            # Wait between 15 to 25 seconds for each new event
-            await asyncio.sleep(random.uniform(15.0, 25.0))
-            
-            # Select random emergency type
-            evt = random.choice(EMERGENCY_TYPES)
-            
-            # Slightly offset coordinates near the city centre
-            dlat = random.uniform(-0.015, 0.015)
-            dlng = random.uniform(-0.015, 0.015)
-            
-            event_id = f"EVT-{random.randint(1000, 9999)}"
-            data = {
-                "id": event_id,
-                "title": f"{evt['icon']} {evt['title']}",
-                "category": evt["category"],
-                "priority": evt["priority"],
-                "description": evt["desc"],
-                "lat": lat + dlat,
-                "lon": lng + dlng,
-                "status": "Alert Received",
-                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-            }
-            yield json.dumps({"type": "EMERGENCY", "event": data})
-            
+                h = hash(ticket["id"])
+                dlat = ((h % 100) - 50) / 3500.0
+                dlng = (((h // 100) % 100) - 50) / 3500.0
+                
+                event_data = {
+                    "id": ticket["id"],
+                    "title": f"🚨 {ticket['title']}",
+                    "category": ticket["category"],
+                    "priority": ticket["priority"],
+                    "description": ticket["description"],
+                    "lat": lat + dlat,
+                    "lon": lng + dlng,
+                    "status": ticket["status"],
+                    "timestamp": ticket.get("submitted_at"),
+                    "is_new": True
+                }
+                yield json.dumps({"type": "EMERGENCY", "event": event_data})
+            except asyncio.TimeoutError:
+                # Heartbeat to keep connection alive
+                yield json.dumps({"type": "PING", "timestamp": time.time()})
+            except Exception as e:
+                logger.error(f"Error in SSE event stream: {e}")
+                break
+
     async def sse_wrapper():
-        async for item in event_generator():
-            yield {"data": item}
-            
+        try:
+            async for item in event_generator():
+                yield {"data": item}
+        finally:
+            if queue in emergency_queues:
+                emergency_queues.remove(queue)
+                
     return EventSourceResponse(sse_wrapper())
-
-
-class DispatchRequest(BaseModel):
-    event_id: str
-    action_name: str
-    impact: str
-
-
-@app.post("/api/emergency/dispatch")
-def post_emergency_dispatch(req: DispatchRequest):
-    """
-    Triggers dispatch of municipal workers to resolve an emergency,
-    logging it into the action_history database table.
-    """
-    conn = sqlite3.connect(SQLITE_PATH)
-    cursor = conn.cursor()
-    try:
-        # Insert into action_history
-        cursor.execute(
-            "INSERT INTO action_history (id, action_name, impact, stage, status) VALUES (?, ?, ?, ?, ?)",
-            (req.event_id, req.action_name, req.impact, 2, "Dispatched")
-        )
-        conn.commit()
-        conn.close()
-        return {"success": True, "message": f"Dispatch successfully triggered for incident {req.event_id}"}
-    except Exception as e:
-        conn.close()
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)
-
