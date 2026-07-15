@@ -1,9 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Sliders, Cpu, Loader2, Sparkles } from 'lucide-react';
+import { Sliders, Cpu, Loader2, Sparkles, FileDown, AlertTriangle } from 'lucide-react';
 
+const CRISIS_SCENARIOS = {
+  normal: {
+    name: "Normal Operations",
+    icon: "✅",
+    desc: "Baseline municipal metrics, no active crises.",
+    params: { busTransit: 0, signalTimer: 0, emergencyTeams: 40, solarFunding: 10, congestionToll: 0 }
+  },
+  monsoon: {
+    name: "⛈️ Monsoon Flooding",
+    icon: "🌧️",
+    desc: "Water logging, traffic congestion, high safety risk, emergency teams stretched.",
+    params: { busTransit: -10, signalTimer: 30, emergencyTeams: 90, solarFunding: 10, congestionToll: 8 }
+  },
+  heatwave: {
+    name: "🔥 Extreme Heatwave",
+    icon: "🥵",
+    desc: "High grid load, power substation warnings, solar arrays operating under high thermal strain.",
+    params: { busTransit: 20, signalTimer: 10, emergencyTeams: 50, solarFunding: 35, congestionToll: 0 }
+  },
+  strike: {
+    name: "⚠️ Public Transit Strike",
+    icon: "🚧",
+    desc: "Buses offline, extreme ring road delays, citizens dissatisfied, budget deficit threat.",
+    params: { busTransit: -20, signalTimer: 0, emergencyTeams: 30, solarFunding: 10, congestionToll: 12 }
+  },
+  grid_surge: {
+    name: "🏭 Industrial Power Surge",
+    icon: "⚡",
+    desc: "Grid overload at DISCOM Substation. High carbon footprint.",
+    params: { busTransit: 10, signalTimer: 15, emergencyTeams: 40, solarFunding: 20, congestionToll: 4 }
+  }
+};
 
 export default function WhatIfSimulator({ onForecastRun }) {
+  const [selectedScenario, setSelectedScenario] = useState('normal');
   const [params, setParams] = useState({
     busTransit: 0,       // -20 to +100%
     signalTimer: 0,      // 0 to +60 seconds
@@ -23,6 +56,14 @@ export default function WhatIfSimulator({ onForecastRun }) {
   const [simulatedCurve, setSimulatedCurve] = useState(null);
   const [aiReport, setAiReport] = useState('');
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // Sync sliders to selected crisis scenario
+  useEffect(() => {
+    if (selectedScenario && CRISIS_SCENARIOS[selectedScenario]) {
+      setParams({ ...CRISIS_SCENARIOS[selectedScenario].params });
+    }
+  }, [selectedScenario]);
 
   // Re-calculate projected metrics when policy params change (local fast preview)
   useEffect(() => {
@@ -51,12 +92,12 @@ export default function WhatIfSimulator({ onForecastRun }) {
   const runAiForecast = () => {
     setLoading(true);
     if (onForecastRun) {
-      onForecastRun(params);
+      onForecastRun({ ...params, scenario: selectedScenario });
     }
     fetch('/api/simulate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(params)
+      body: JSON.stringify({ ...params, scenario: selectedScenario })
     })
       .then(res => res.json())
       .then(data => {
@@ -70,6 +111,12 @@ export default function WhatIfSimulator({ onForecastRun }) {
       .finally(() => {
         setLoading(false);
       });
+  };
+
+  const exportPdf = () => {
+    setExporting(true);
+    window.location.href = '/api/audit/pdf';
+    setTimeout(() => setExporting(false), 2000);
   };
 
   // Prepare data for ECharts (24-hour congestion curve simulation)
@@ -168,19 +215,67 @@ export default function WhatIfSimulator({ onForecastRun }) {
           </h3>
           <span className="card-subtitle">Test and predict the systemic impact of municipal policy decisions before implementation</span>
         </div>
-        <button
-          onClick={runAiForecast}
-          disabled={loading}
-          className="btn-3d btn-primary flex items-center gap-2 text-xs py-1.5 px-3"
-          style={{ cursor: 'pointer' }}
-        >
-          {loading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Cpu className="w-3.5 h-3.5" />
-          )}
-          <span>{loading ? 'Analyzing...' : 'Run AI Forecast Model'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={exportPdf}
+            disabled={exporting}
+            className="btn-3d btn-secondary flex items-center gap-1.5 text-xs py-1.5 px-3"
+            style={{ cursor: 'pointer' }}
+          >
+            {exporting ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <FileDown className="w-3.5 h-3.5" />
+            )}
+            <span>Export PDF Briefing</span>
+          </button>
+          
+          <button
+            onClick={runAiForecast}
+            disabled={loading}
+            className="btn-3d btn-primary flex items-center gap-2 text-xs py-1.5 px-3"
+            style={{ cursor: 'pointer' }}
+          >
+            {loading ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Cpu className="w-3.5 h-3.5" />
+            )}
+            <span>{loading ? 'Analyzing...' : 'Run AI Forecast Model'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Crisis Scenario Selector Dropdown */}
+      <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-blue-500/10 text-blue-600 rounded-xl">
+            <AlertTriangle className="w-5 h-5 animate-pulse" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Crisis Scenario Sandbox</div>
+            <div className="text-sm font-bold text-slate-800 dark:text-slate-105 mt-0.5">
+              {CRISIS_SCENARIOS[selectedScenario].name}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              {CRISIS_SCENARIOS[selectedScenario].desc}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-550 dark:text-slate-400 whitespace-nowrap">Select Crisis:</span>
+          <select
+            value={selectedScenario}
+            onChange={(e) => setSelectedScenario(e.target.value)}
+            className="text-xs font-bold bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+          >
+            {Object.entries(CRISIS_SCENARIOS).map(([key, sc]) => (
+              <option key={key} value={key}>
+                {sc.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="simulator-layout">

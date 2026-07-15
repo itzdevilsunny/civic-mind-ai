@@ -441,6 +441,7 @@ class SimulationRequest(BaseModel):
     emergencyTeams: float
     solarFunding: float
     congestionToll: float
+    scenario: Optional[str] = "normal"
 
 class SenateMessage(BaseModel):
     agent: str
@@ -2608,21 +2609,53 @@ async def chat_copilot(payload: ChatMessage, request: Request):
 @app.post("/api/simulate")
 def run_simulation(payload: SimulationRequest):
     """
-    Simulates the impact of policy parameters on London central using Gemini 2.5
+    Simulates the impact of policy parameters on the city central using Gemini 2.5
     and returns simulated metrics, a 24h congestion curve, and a policy report.
     """
-    # 1. Prepare baseline math model (as fallback or input)
+    scenario = payload.scenario or "normal"
+    
+    # 1. Prepare base impact metrics depending on the crisis scenario
+    base_safety = 82
+    base_emissions = 100
+    base_delays = 48
+    base_satisfaction = 74
+    base_budget = 45
+    
+    congestion_factor = 1.0
+    
+    if scenario == "monsoon":
+        base_safety = 50
+        base_delays = 75
+        base_satisfaction = 52
+        base_budget = 35
+        congestion_factor = 1.6
+    elif scenario == "heatwave":
+        base_emissions = 140
+        base_satisfaction = 58
+        base_safety = 70
+        congestion_factor = 1.1
+    elif scenario == "strike":
+        base_delays = 85
+        base_satisfaction = 32
+        base_budget = 30
+        congestion_factor = 1.9
+    elif scenario == "grid_surge":
+        base_emissions = 150
+        base_safety = 75
+        base_budget = 40
+        congestion_factor = 1.2
+        
     deltaTransit = payload.busTransit / 100.0
     deltaSignals = payload.signalTimer / 60.0
     deltaTeams = (payload.emergencyTeams - 40.0) / 40.0
     deltaSolar = (payload.solarFunding - 10.0) / 10.0
     deltaToll = payload.congestionToll / 20.0
 
-    math_safety = int(min(99, max(30, 82 + deltaTeams * 12 + deltaTransit * 3 - deltaSignals * 2)))
-    math_emissions = int(max(40, 100 - deltaTransit * 22 - deltaSolar * 15 - deltaToll * 18))
-    math_delays = int(max(5, 48 - deltaTransit * 12 - deltaSignals * 8 - deltaToll * 20))
-    math_satisfaction = int(min(99, max(20, 74 + deltaTransit * 8 + deltaTeams * 6 - deltaToll * 10 + deltaSolar * 5)))
-    math_budget = int(max(0, 45 - deltaTransit * 15 - deltaSolar * 8 - deltaTeams * 4 + deltaToll * 12))
+    math_safety = int(min(99, max(20, base_safety + deltaTeams * 25 + deltaTransit * 5 - deltaSignals * 2)))
+    math_emissions = int(max(30, base_emissions - deltaTransit * 22 - deltaSolar * 25 - deltaToll * 18))
+    math_delays = int(max(5, base_delays - deltaTransit * 15 - deltaSignals * 10 - deltaToll * 22))
+    math_satisfaction = int(min(99, max(15, base_satisfaction + deltaTransit * 12 + deltaTeams * 8 - deltaToll * 15 + deltaSolar * 8)))
+    math_budget = int(max(0, base_budget - deltaTransit * 15 - deltaSolar * 10 - deltaTeams * 5 + deltaToll * 15))
 
     baseline_curve = [15, 12, 10, 15, 30, 55, 82, 95, 88, 70, 55, 52, 58, 55, 50, 62, 85, 98, 90, 75, 50, 35, 22, 18]
     math_curve = []
@@ -2633,45 +2666,46 @@ def run_simulation(payload: SimulationRequest):
             reductionCoeff -= (payload.congestionToll / 20.0) * 0.22
         else:
             reductionCoeff -= (payload.congestionToll / 20.0) * 0.05
-        math_curve.append(int(val * max(0.2, reductionCoeff)))
+        # Apply crisis congestion factor
+        math_curve.append(int(val * congestion_factor * max(0.15, reductionCoeff)))
 
-    math_report = f"""### Mathematical Simulation Analysis
+    math_report = f"""### Mathematical Simulation Analysis [Crisis Scenario: {scenario.upper()}]
 
+- **Crisis Assessment**: Under **{scenario.upper()}** conditions, city operations are altered.
 - **Public Transit Adjustments**: Setting public transit offset shift to **{payload.busTransit}%** alters standard commuter modes, cutting emissions.
 - **Traffic Light Signal Timing**: Green timing offset of **{payload.signalTimer} seconds** reduces peak delays.
 - **Emergency Teams**: Deploying **{payload.emergencyTeams} active teams** increases public safety response index.
 - **Solar Grid Infrastructure Funding**: **{payload.solarFunding} $M** funding reduces carbon outputs.
-- **Congestion Toll**: Congestion pricing of **£{payload.congestionToll}** shifts traffic flows during peak periods.
+- **Congestion Toll**: Congestion pricing of **${payload.congestionToll}** shifts traffic flows during peak periods.
 """
 
     if gemini_available:
         try:
             model = genai.GenerativeModel("gemini-2.5-flash")
             prompt = f"""
-            You are the London Decision Intelligence Simulation Engine.
-            Simulate the impact of the following municipal policy parameters:
+            You are the CivicMind AI Decision Intelligence Simulation Engine.
+            Simulate the impact of the following municipal policy parameters under the crisis scenario: "{scenario}":
             - Bus Transit Frequency Shift: {payload.busTransit}%
             - Traffic Signal Adjustments: {payload.signalTimer} seconds
             - Emergency Response Teams: {payload.emergencyTeams} active teams (baseline is 40)
             - Solar Grid Infrastructure Funding: {payload.solarFunding} $M
-            - Congestion Toll Rate: £{payload.congestionToll}
+            - Congestion Toll Rate: ${payload.congestionToll}
             
             You must output a JSON object containing:
             1. "metrics": An object with:
                - "safety": Projected safety index (0 to 100, baseline math model predicts {math_safety})
-               - "emissions": Projected emissions index (0 to 150, baseline math model predicts {math_emissions})
+               - "emissions": Projected emissions index (0 to 200, baseline math model predicts {math_emissions})
                - "delays": Average peak delays (minutes, baseline math model predicts {math_delays})
                - "satisfaction": Public satisfaction index (0 to 100, baseline math model predicts {math_satisfaction})
                - "budget": Remaining municipal budget ($M, baseline math model predicts {math_budget})
             2. "congestionCurve": A list of 24 integers representing projected congestion percentage hourly from 0:00 to 23:00 (baseline math model predicts {math_curve}).
-            3. "report": A detailed markdown analysis report (approx. 200 words) describing the trade-offs, advantages, and risks of this policy configuration for London.
+            3. "report": A detailed markdown analysis report (approx. 200 words) describing the trade-offs, advantages, and risks of this policy configuration under the {scenario} crisis for the city.
             
             Format your response strictly as a raw JSON object. Do not include any markdown formatting wrappers (like ```json).
             """
             response = model.generate_content(prompt)
             data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
             
-            # Basic schema validation
             if "metrics" in data and "congestionCurve" in data and "report" in data:
                 return data
         except Exception as e:
@@ -2688,6 +2722,7 @@ def run_simulation(payload: SimulationRequest):
         "congestionCurve": math_curve,
         "report": math_report
     }
+
 
 @app.post("/api/senate/debate")
 def run_senate_debate(payload: SimulationRequest):
