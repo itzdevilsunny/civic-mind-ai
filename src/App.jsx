@@ -104,6 +104,7 @@ export default function App() {
   const [isBackendOnline, setIsBackendOnline] = useState(false);
   const [activeToast, setActiveToast] = useState(null);
   const [dispatchedEmergency, setDispatchedEmergency] = useState(null);
+  const [autopilotEnabled, setAutopilotEnabled] = useState(false);
   
   // City & Language state
   const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('civicmind_city') || 'mumbai');
@@ -369,8 +370,9 @@ export default function App() {
       fetch(`/api/live/aqi/forecast?${geoQ2}`).then(hj).catch(() => null),
       fetch(`/api/live/bikepoints?city=${encodeURIComponent(cityInfo.label)}&lat=${lat}&lng=${lng}`).then(hj).catch(() => null),
       fetch('/api/sustainability/metrics').then(hj).catch(() => null),
-      fetch('/api/proposals').then(hj).catch(() => [])
-    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData, proposalsData]) => {
+      fetch('/api/proposals').then(hj).catch(() => []),
+      fetch('/api/autopilot').then(hj).catch(() => null)
+    ]).then(([weather, aqi, transport, market, news, dbTickets, telemetryData, actionsData, aqiForecastData, bikepointsData, sustainabilityData, proposalsData, autopilotData]) => {
       if (weather) setLiveWeather(weather);
       if (aqi) setLiveAqi(aqi);
       if (transport && transport.length > 0) setLiveTransport(transport);
@@ -382,6 +384,7 @@ export default function App() {
       if (bikepointsData) setBikepoints(bikepointsData);
       if (sustainabilityData) setSustainability(sustainabilityData);
       if (proposalsData) setProposals(proposalsData);
+      if (autopilotData) setAutopilotEnabled(autopilotData.enabled);
       if (dbTickets) {
         setTickets(dbTickets);
         setIsBackendOnline(true);
@@ -432,6 +435,24 @@ export default function App() {
       });
   };
 
+  const handleAutopilotToggle = (enabled) => {
+    setAutopilotEnabled(enabled);
+    fetch('/api/autopilot/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setAutopilotEnabled(data.enabled);
+        setSystemLogs(prev => [`[System Control] AI Autonomous Autopilot ${data.enabled ? 'ENABLED' : 'DISABLED'}`, ...prev]);
+      })
+      .catch(err => {
+        console.error("Failed to toggle autopilot:", err);
+        setAutopilotEnabled(!enabled); // revert
+      });
+  };
+
   useEffect(() => {
     loadLiveData();
     const interval = setInterval(loadLiveData, 30000);
@@ -464,6 +485,48 @@ export default function App() {
     eventSource.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data);
+        if (parsed.type === 'AUTOPILOT_DISPATCH') {
+          if (!isSignedIn || userRole !== 'admin') return;
+          const evt = parsed.event;
+          const action = evt.action;
+          setAlerts(prev => {
+            if (prev.some(a => a.id === evt.id)) return prev;
+            return [
+              {
+                id: evt.id,
+                type: 'safety',
+                title: evt.title,
+                body: evt.description,
+                ts: Date.now(),
+                read: false,
+                lat: evt.lat,
+                lon: evt.lon,
+                image: evt.image
+              },
+              ...prev
+            ];
+          });
+          const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2568/2568-500.wav");
+          audio.volume = 0.45;
+          audio.play().catch(() => {});
+          setActiveToast({
+            ...evt,
+            title: `🤖 Autopilot Active: ${action.action_name}`,
+            description: `Autonomous Actuator dispatched. Outcome: ${action.impact}`
+          });
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(`Autopilot alert. Autonomous dispatch initiated. Action: ${action.action_name}.`);
+            utterance.rate = 1.05;
+            window.speechSynthesis.speak(utterance);
+          }
+          setSystemLogs(prev => [
+            `🤖 [Autopilot Actuator] Autonomous dispatch trigger ${action.id} generated for ticket ${evt.id}.`,
+            ...prev
+          ]);
+          loadLiveData();
+        }
+
         if (parsed.type === 'EMERGENCY') {
           // RESTRICTION: Only city administrators receive live emergencies/toasts/alarms
           if (!isSignedIn || userRole !== 'admin') return;
@@ -1368,6 +1431,26 @@ export default function App() {
                       animation: 'pulse 2s infinite',
                     }}>{alerts.filter(a => !a.read).length}</span>
                   )}
+                </button>
+              )}
+              {isSignedIn && userRole === 'admin' && (
+                <button
+                  onClick={() => handleAutopilotToggle(!autopilotEnabled)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-300 ${
+                    autopilotEnabled
+                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.2)]'
+                      : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300'
+                  }`}
+                  style={{ cursor: 'pointer' }}
+                  title="Toggle Autonomous AI Autopilot Dispatch"
+                >
+                  <span className="relative flex h-2 w-2">
+                    {autopilotEnabled && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    )}
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${autopilotEnabled ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                  </span>
+                  <span>🤖 {autopilotEnabled ? "Autopilot: ON" : "Autopilot: OFF"}</span>
                 </button>
               )}
               <LanguageSwitcher

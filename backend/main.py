@@ -53,6 +53,7 @@ else:
 # --- Database Wrapper Engine (Supabase + SQLite Fallback) ---
 SQLITE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "civicmind.db"))
 USE_SUPABASE = False
+AUTOPILOT_ENABLED = False
 
 def init_db():
     global USE_SUPABASE
@@ -2193,6 +2194,22 @@ def get_actions():
     Returns the action history log from the database.
     """
     return db_get_action_history()
+
+class AutopilotToggleRequest(BaseModel):
+    enabled: bool
+
+@app.get("/api/autopilot")
+def get_autopilot_status():
+    global AUTOPILOT_ENABLED
+    return {"enabled": AUTOPILOT_ENABLED}
+
+@app.post("/api/autopilot/toggle")
+def toggle_autopilot_status(req: AutopilotToggleRequest):
+    global AUTOPILOT_ENABLED
+    AUTOPILOT_ENABLED = req.enabled
+    logger.info(f"AI Autopilot Mode toggled to: {AUTOPILOT_ENABLED}")
+    return {"enabled": AUTOPILOT_ENABLED}
+
 class EmergencyDispatchRequest(BaseModel):
     service_id: str
     ticket_id: str
@@ -2282,6 +2299,7 @@ def emergency_dispatch(payload: EmergencyDispatchRequest, background_tasks: Back
         raise HTTPException(status_code=500, detail=str(e))
 @app.post("/api/tickets")
 def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks):
+    global AUTOPILOT_ENABLED
     """
     Intake citizen complaints, classify category and priority using Gemini,
     insert into database, and kick off the workflow timeline.
@@ -2355,6 +2373,87 @@ def create_ticket(complaint: ComplaintSubmit, background_tasks: BackgroundTasks)
 
     # Start the background task to simulate ticket progress stepper
     background_tasks.add_task(simulate_ticket_pipeline, ticket_id)
+
+    # 4. AI Autopilot autonomous dispatch triggering
+    if AUTOPILOT_ENABLED:
+        action_name = f"Autopilot Response: {new_ticket['category']}"
+        impact = f"Autonomous dispatch dispatched to resolve {new_ticket['id']} ({new_ticket['title']})."
+        
+        if gemini_available and gemini_model:
+            try:
+                dispatch_prompt = f"""
+                You are the CivicMind AI Autonomous City Actuator.
+                A citizen has reported this issue:
+                Title: {new_ticket['title']}
+                Category: {new_ticket['category']}
+                Description: {new_ticket['description']}
+                Priority: {new_ticket['priority']}
+                
+                Formulate an autonomous municipal dispatch plan.
+                Output a JSON object containing:
+                "action_name": "Action description (e.g. Deploy PWD Road Repair Unit)",
+                "impact": "Expected positive outcome (e.g. Repair pothole on SV Road and secure area)"
+                
+                Only return raw JSON. No markdown backticks or formatting. Just raw JSON.
+                """
+                response = gemini_model.generate_content(dispatch_prompt)
+                dispatch_data = json.loads(response.text.strip().replace("```json", "").replace("```", ""))
+                action_name = dispatch_data.get("action_name", action_name)
+                impact = dispatch_data.get("impact", impact)
+            except Exception as e:
+                logger.warning(f"AI Autopilot dispatch calculation failed: {e}")
+        
+        action_id = f"ACT-{uuid.uuid4().hex[:4].upper()}"
+        new_action = {
+            "id": action_id,
+            "action_name": action_name,
+            "impact": impact,
+            "stage": 1,
+            "triggered_at": datetime.now(timezone.utc).isoformat()
+        }
+        try:
+            conn = sqlite3.connect(SQLITE_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO action_history (id, action_name, impact, stage, triggered_at) VALUES (?, ?, ?, ?, ?)",
+                (new_action["id"], new_action["action_name"], new_action["impact"], new_action["stage"], new_action["triggered_at"])
+            )
+            conn.commit()
+            conn.close()
+            logger.info(f"AI Autopilot autonomous dispatch recorded: {action_id} | {action_name}")
+        except Exception as e:
+            logger.error(f"Failed to record autopilot action in database: {e}")
+        
+        h = hash(new_ticket["id"])
+        dlat = ((h % 100) - 50) / 3500.0
+        dlng = (((h // 100) % 100) - 50) / 3500.0
+        event_lat = 19.076 + dlat
+        event_lon = 72.8777 + dlng
+        
+        autopilot_event = {
+            "type": "AUTOPILOT_DISPATCH",
+            "event": {
+                "id": new_ticket["id"],
+                "title": f"🤖 Autopilot: {new_ticket['title']}",
+                "category": new_ticket["category"],
+                "priority": new_ticket["priority"],
+                "description": new_ticket["description"],
+                "lat": event_lat,
+                "lon": event_lon,
+                "status": new_ticket["status"],
+                "timestamp": new_ticket["submitted_at"],
+                "image": new_ticket["image"],
+                "is_new": True,
+                "action": new_action
+            }
+        }
+        for q in emergency_queues:
+            try:
+                q.put_nowait(autopilot_event)
+            except Exception as e:
+                logger.error(f"Error putting autopilot dispatch event in SSE queue: {e}")
+        
+        background_tasks.add_task(simulate_dispatch_pipeline, action_id)
 
     return new_ticket
 
@@ -5109,6 +5208,9 @@ async def get_live_emergencies(request: Request, city: str = "Mumbai", lat: floa
             try:
                 # Wait for new ticket event from the queue
                 ticket = await asyncio.wait_for(queue.get(), timeout=2.0)
+                if isinstance(ticket, dict) and "type" in ticket:
+                    yield json.dumps(ticket)
+                    continue
                 
                 h = hash(ticket["id"])
                 dlat = ((h % 100) - 50) / 3500.0
