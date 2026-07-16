@@ -235,6 +235,9 @@ export default function DigitalTwin({
   const [vehicles, setVehicles] = useState([]);
   const routeLineRef = useRef(null);
   const rerouteLineRef = useRef(null);
+  const [barricades, setBarricades] = useState([]);
+  const [isDrawingBarrier, setIsDrawingBarrier] = useState(false);
+  const barricadeLayersRef = useRef({});
 
   // Style injector for map dash animations and pulsing rings
   useEffect(() => {
@@ -304,7 +307,7 @@ export default function DigitalTwin({
     return () => clearInterval(interval);
   }, [cityInfo]);
 
-  // 2. Dispatch routing responder vehicle
+  // 2. Dispatch routing responder vehicle with dynamic barricade detours
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map || !window.L || !dispatchedEmergency || !cityInfo) return;
@@ -316,7 +319,54 @@ export default function DigitalTwin({
     const startPoint = [cityInfo.lat - 0.005, cityInfo.lng + 0.005];
     const endPoint = [dispatchedEmergency.lat, dispatchedEmergency.lon];
 
-    const polyline = window.L.polyline([startPoint, endPoint], {
+    let routeCoords = [startPoint, endPoint];
+    let collidingBarricade = null;
+    let minDistance = Infinity;
+
+    barricades.forEach(barr => {
+      const x1 = startPoint[1], y1 = startPoint[0];
+      const x2 = endPoint[1], y2 = endPoint[0];
+      const bx = barr.lng, by = barr.lat;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const L2 = dx*dx + dy*dy;
+      if (L2 > 0) {
+        let t_proj = ((bx - x1)*dx + (by - y1)*dy) / L2;
+        t_proj = Math.max(0, Math.min(1, t_proj));
+        const nx = x1 + t_proj*dx;
+        const ny = y1 + t_proj*dy;
+        const dist = Math.sqrt((bx - nx)*(bx - nx) + (by - ny)*(by - ny));
+        if (dist < 0.004 && dist < minDistance) {
+          minDistance = dist;
+          collidingBarricade = barr;
+        }
+      }
+    });
+
+    let detourPoint = null;
+    if (collidingBarricade) {
+      const x1 = startPoint[1], y1 = startPoint[0];
+      const x2 = endPoint[1], y2 = endPoint[0];
+      const bx = collidingBarricade.lng, by = collidingBarricade.lat;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.sqrt(dx*dx + dy*dy);
+      if (length > 0) {
+        let px = -dy / length;
+        let py = dx / length;
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const dot = (bx - mx)*px + (by - my)*py;
+        const direction = dot > 0 ? -1 : 1;
+        detourPoint = [
+          my + py * 0.006 * direction,
+          mx + px * 0.006 * direction
+        ];
+        routeCoords = [startPoint, detourPoint, endPoint];
+      }
+    }
+
+    const polyline = window.L.polyline(routeCoords, {
       color: '#f43f5e',
       weight: 4.5,
       opacity: 0.9,
@@ -331,8 +381,22 @@ export default function DigitalTwin({
     const interval = setInterval(() => {
       progress += 1;
       const t = progress / stepCount;
-      const curLat = startPoint[0] + (endPoint[0] - startPoint[0]) * t;
-      const curLng = startPoint[1] + (endPoint[1] - startPoint[1]) * t;
+      let curLat, curLng;
+
+      if (detourPoint) {
+        if (progress <= 20) {
+          const t_seg = progress / 20;
+          curLat = startPoint[0] + (detourPoint[0] - startPoint[0]) * t_seg;
+          curLng = startPoint[1] + (detourPoint[1] - startPoint[1]) * t_seg;
+        } else {
+          const t_seg = (progress - 20) / 20;
+          curLat = detourPoint[0] + (endPoint[0] - detourPoint[0]) * t_seg;
+          curLng = detourPoint[1] + (endPoint[1] - detourPoint[1]) * t_seg;
+        }
+      } else {
+        curLat = startPoint[0] + (endPoint[0] - startPoint[0]) * t;
+        curLng = startPoint[1] + (endPoint[1] - startPoint[1]) * t;
+      }
 
       setVehicles(prev => {
         const idx = prev.findIndex(v => v.id === 'v-dispatched-unit');
@@ -346,7 +410,6 @@ export default function DigitalTwin({
           symbol: '🚒',
           heading: 0
         };
-
         if (idx === -1) return [...prev, unit];
         const updated = [...prev];
         updated[idx] = unit;
@@ -440,6 +503,121 @@ export default function DigitalTwin({
       mapInstanceRef.current.setView([cityInfo.lat, cityInfo.lng], 13);
     }
   }, [cityInfo]);
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !window.L) return;
+
+    const onMapClick = (e) => {
+      if (isDrawingBarrier) {
+        const newBarricade = {
+          id: `barricade-${Date.now()}`,
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+          city: cityInfo?.label || 'Mumbai'
+        };
+        setBarricades(prev => [...prev, newBarricade]);
+        setIsDrawingBarrier(false);
+        const logMsg = `[Map Authority] Road closure barricade established at coordinates (${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}). Recalculating detour routes...`;
+        window.dispatchEvent(new CustomEvent('civicmind_log', { detail: logMsg }));
+      }
+    };
+
+    map.on('click', onMapClick);
+    return () => {
+      map.off('click', onMapClick);
+    };
+  }, [isDrawingBarrier, cityInfo]);
+
+  // Draw and update road block barricades on the Leaflet map
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !window.L) return;
+
+    // Clear old barricades
+    Object.keys(barricadeLayersRef.current).forEach(id => {
+      const layerGroup = barricadeLayersRef.current[id];
+      if (layerGroup) {
+        map.removeLayer(layerGroup.marker);
+        map.removeLayer(layerGroup.circle);
+      }
+    });
+    barricadeLayersRef.current = {};
+
+    const activeCityBarriers = barricades.filter(b => b.city === (cityInfo?.label || 'Mumbai'));
+
+    activeCityBarriers.forEach(barr => {
+      const iconHtml = `
+        <div style="
+          background-color: #f59e0b;
+          border: 2px solid #000000;
+          color: white;
+          width: 24px;
+          height: 24px;
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
+        ">🚧</div>
+      `;
+
+      const customIcon = window.L.divIcon({
+        html: iconHtml,
+        className: 'custom-barricade-marker',
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
+      });
+
+      const marker = window.L.marker([barr.lat, barr.lng], { icon: customIcon }).addTo(map);
+      marker.bindPopup(`
+        <div class="map-marker-popup font-mono text-[10px]">
+          <strong style="color: #d97706">🚧 ACTIVE ROAD CLOSURE</strong><br/>
+          <span>Coordinates: ${barr.lat.toFixed(4)}, ${barr.lng.toFixed(4)}</span><br/>
+          <button 
+            id="btn-remove-${barr.id}"
+            style="margin-top: 6px; padding: 2px 6px; font-size: 9px; font-weight: bold; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;"
+          >
+            Remove Barrier
+          </button>
+        </div>
+      `);
+
+      marker.on('popupopen', () => {
+        const btn = document.getElementById(`btn-remove-${barr.id}`);
+        if (btn) {
+          btn.onclick = () => {
+            map.closePopup();
+            setBarricades(prev => prev.filter(b => b.id !== barr.id));
+            const logMsg = `[Map Authority] Barricade removed. Restoring normal route lines.`;
+            window.dispatchEvent(new CustomEvent('civicmind_log', { detail: logMsg }));
+          };
+        }
+      });
+
+      const circle = window.L.circle([barr.lat, barr.lng], {
+        radius: 400,
+        color: '#ef4444',
+        fillColor: '#ef4444',
+        fillOpacity: 0.1,
+        weight: 1.5,
+        dashArray: '4, 4'
+      }).addTo(map);
+
+      barricadeLayersRef.current[barr.id] = { marker, circle };
+    });
+
+    return () => {
+      Object.keys(barricadeLayersRef.current).forEach(id => {
+        const layerGroup = barricadeLayersRef.current[id];
+        if (layerGroup) {
+          map.removeLayer(layerGroup.marker);
+          map.removeLayer(layerGroup.circle);
+        }
+      });
+    };
+  }, [barricades, cityInfo]);
 
   useEffect(() => {
     if (!mapContainerRef.current || !window.L || !cityInfo) return;
@@ -873,6 +1051,20 @@ export default function DigitalTwin({
           <span className="card-subtitle">Real-time OpenStreetMap overlay of {cityInfo?.label || 'City'} municipal IoT network</span>
         </div>
         <div className="flex flex-wrap gap-2">
+          {userRole === 'admin' && (
+            <button
+              onClick={() => setIsDrawingBarrier(!isDrawingBarrier)}
+              className={`btn flex items-center gap-1.5 py-1 px-3 text-xs rounded-full border transition-all ${
+                isDrawingBarrier 
+                  ? 'bg-amber-600 border-amber-500 text-white animate-pulse'
+                  : 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-405 hover:bg-amber-500/20'
+              }`}
+              style={{ cursor: 'pointer' }}
+              title="Click on the map to place a road closure barrier"
+            >
+              <span>🚧 {isDrawingBarrier ? 'Place Barrier...' : 'Block Road'}</span>
+            </button>
+          )}
           {Object.keys(activeLayers).map(layer => (
             <button
               key={layer}

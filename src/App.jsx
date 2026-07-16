@@ -457,6 +457,16 @@ export default function App() {
   };
 
   useEffect(() => {
+    const handleCustomLog = (e) => {
+      if (e.detail) {
+        setSystemLogs(prev => [e.detail, ...prev]);
+      }
+    };
+    window.addEventListener('civicmind_log', handleCustomLog);
+    return () => window.removeEventListener('civicmind_log', handleCustomLog);
+  }, []);
+
+  useEffect(() => {
     loadLiveData();
     const interval = setInterval(loadLiveData, 30000);
     return () => clearInterval(interval);
