@@ -22,6 +22,8 @@ const getOffsetNodes = (city) => {
 function CctvFeed({ node }) {
   const canvasRef = useRef(null);
   const [feedMode, setFeedMode] = useState('ai'); // 'ai' or 'thermal'
+  const [activeHazard, setActiveHazard] = useState(null);
+  const [isReporting, setIsReporting] = useState(false);
   
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -97,6 +99,64 @@ function CctvFeed({ node }) {
           ctx.fillText(`${obj.type[0]}:${obj.score}%`, obj.x + 2, obj.y - 3);
         });
 
+        // Draw Injected Hazards
+        if (activeHazard === 'pothole') {
+          // Cracked Pothole Graphic
+          ctx.fillStyle = '#1c1917';
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.ellipse(170, 75, 18, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(160, 75);
+          ctx.lineTo(180, 75);
+          ctx.moveTo(170, 70);
+          ctx.lineTo(170, 80);
+          ctx.stroke();
+
+          // Neon BB
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(148, 62, 44, 26);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(148, 50, 88, 12);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 8px monospace';
+          ctx.fillText('🚨 POTHOLE DISTRESS (92%)', 151, 59);
+        } else if (activeHazard === 'breakdown') {
+          // Red Breakdown Car
+          ctx.fillStyle = '#b91c1c';
+          ctx.fillRect(200, 60, 46, 28);
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(205, 57, 10, 3);
+          ctx.fillRect(230, 57, 10, 3);
+          ctx.fillRect(205, 88, 10, 3);
+          ctx.fillRect(230, 88, 10, 3);
+
+          if (Math.floor(Date.now() / 300) % 2 === 0) {
+            ctx.fillStyle = '#f59e0b';
+            ctx.beginPath();
+            ctx.arc(202, 64, 3, 0, Math.PI * 2);
+            ctx.arc(202, 84, 3, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // Neon BB
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(196, 54, 54, 40);
+          ctx.fillStyle = '#ef4444';
+          ctx.fillRect(196, 42, 92, 12);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 8px monospace';
+          ctx.fillText('🚨 BREAKDOWN HAZARD (95%)', 199, 51);
+        }
+
         // Scanline effect
         ctx.fillStyle = 'rgba(16, 185, 129, 0.05)';
         for (let y = 0; y < canvas.height; y += 4) {
@@ -156,7 +216,44 @@ function CctvFeed({ node }) {
     return () => {
       cancelAnimationFrame(animationId);
     };
-  }, [feedMode, node.id]);
+  }, [feedMode, node.id, activeHazard]);
+
+  const handleReportIncident = () => {
+    setIsReporting(true);
+    const title = activeHazard === 'pothole'
+      ? `AI Detected Pothole Distress - CCTV_${node.id.toUpperCase()}`
+      : `AI Detected Vehicle Breakdown - CCTV_${node.id.toUpperCase()}`;
+    const description = activeHazard === 'pothole'
+      ? `Automated computer vision edge detection logged a large pothole distress in lane 2. Location coordinates: (${node.lat.toFixed(4)}, ${node.lon.toFixed(4)}).`
+      : `Automated computer vision edge detection logged a stalled vehicle with flashing hazard lights blocking active traffic lanes. Coordinates: (${node.lat.toFixed(4)}, ${node.lon.toFixed(4)}).`;
+    const category = activeHazard === 'pothole' ? 'Roads & Bridges' : 'Traffic Anomaly';
+
+    const canvas = canvasRef.current;
+    const snapUrl = canvas ? canvas.toDataURL("image/png") : null;
+
+    fetch('/api/tickets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        category,
+        priority: 'High',
+        description,
+        image: snapUrl
+      })
+    })
+      .then(res => res.json())
+      .then(data => {
+        setIsReporting(false);
+        setActiveHazard(null);
+        const logMsg = `[Edge Vision] Ingested automated incident report from CCTV camera node. ID: ${data.id}. Priority: HIGH.`;
+        window.dispatchEvent(new CustomEvent('civicmind_log', { detail: logMsg }));
+      })
+      .catch(err => {
+        console.error("Auto reporting failed:", err);
+        setIsReporting(false);
+      });
+  };
 
   return (
     <div className="mt-3 pt-3 border-t border-slate-150 dark:border-slate-800 flex flex-col gap-2">
@@ -177,14 +274,72 @@ function CctvFeed({ node }) {
         </div>
       </div>
       
+      {/* Simulation injection buttons */}
+      <div className="flex gap-1.5 mt-1">
+        <button 
+          onClick={() => setActiveHazard('pothole')}
+          className={`flex-1 text-[9px] font-extrabold py-1 px-1.5 rounded-lg border transition-all ${
+            activeHazard === 'pothole'
+              ? 'bg-amber-600 border-amber-600 text-white'
+              : 'bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-350'
+          }`}
+          style={{ cursor: 'pointer' }}
+        >
+          ⚠️ Inject Pothole
+        </button>
+        <button 
+          onClick={() => setActiveHazard('breakdown')}
+          className={`flex-1 text-[9px] font-extrabold py-1 px-1.5 rounded-lg border transition-all ${
+            activeHazard === 'breakdown'
+              ? 'bg-amber-600 border-amber-600 text-white'
+              : 'bg-slate-50 border-slate-200 text-slate-650 hover:bg-slate-100 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-350'
+          }`}
+          style={{ cursor: 'pointer' }}
+        >
+          🚗 Inject Breakdown
+        </button>
+        <button 
+          onClick={() => setActiveHazard(null)}
+          className="text-[9px] font-extrabold py-1 px-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-900"
+          style={{ cursor: 'pointer' }}
+        >
+          Clear
+        </button>
+      </div>
+
+      {/* Auto ingest prompt */}
+      {activeHazard && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mt-1 flex flex-col gap-2 animate-scale-in">
+          <div className="flex items-start gap-2">
+            <span className="text-xs">🚨</span>
+            <div>
+              <h5 className="text-[10px] font-black text-red-500 uppercase tracking-wide">Edge Inference Spot Warning</h5>
+              <p className="text-[9px] text-slate-650 dark:text-slate-350 leading-normal mt-0.5">
+                {activeHazard === 'pothole'
+                  ? 'Road surface distress detected. Risk of tire blowout.'
+                  : 'Stalled vehicle in active lanes. Risk of traffic backlog.'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleReportIncident}
+            disabled={isReporting}
+            className="w-full text-center py-1.5 bg-red-650 hover:bg-red-700 text-white font-extrabold text-[9px] uppercase tracking-wide rounded-lg transition-all shadow-[0_0_10px_rgba(220,38,38,0.2)] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+          >
+            {isReporting ? 'Reporting Distress...' : '🚨 Auto-Ingest Incident'}
+          </button>
+        </div>
+      )}
+      
       <div className="flex gap-2 justify-between mt-1">
         <button 
           onClick={() => setFeedMode('ai')} 
           className={`flex-1 text-[10px] font-extrabold py-1.5 px-2 rounded-lg border transition-all ${
             feedMode === 'ai' 
               ? 'bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-900/30 dark:text-emerald-400'
-              : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50 dark:bg-slate-850 dark:border-slate-800 dark:text-slate-350 dark:hover:bg-slate-800'
+              : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50 dark:bg-slate-850 dark:border-slate-800 dark:text-slate-355 dark:hover:bg-slate-800'
           }`}
+          style={{ cursor: 'pointer' }}
         >
           🤖 AI Object Detection
         </button>
@@ -195,6 +350,7 @@ function CctvFeed({ node }) {
               ? 'bg-rose-100 border-rose-300 text-rose-850 dark:bg-rose-950/40 dark:border-rose-900/30 dark:text-rose-450'
               : 'bg-white border-slate-200 text-slate-650 hover:bg-slate-50 dark:bg-slate-850 dark:border-slate-800 dark:text-slate-355 dark:hover:bg-slate-800'
           }`}
+          style={{ cursor: 'pointer' }}
         >
           🔥 Thermal Heatmap
         </button>
