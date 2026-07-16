@@ -6,6 +6,13 @@ export default function WaterWatch({ isDarkMode, cityInfo, _liveWeather }) {
   const [telemetry, setTelemetry] = useState(null);
   const [advice, setAdvice] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [wardPressures, setWardPressures] = useState({
+    'Ward A (South)': 100,
+    'Ward B (Central)': 100,
+    'Ward C (West)': 100,
+    'Ward D (East)': 100,
+    'Ward E (North)': 100
+  });
 
   // Calculator inputs
   const [members, setMembers] = useState(4);
@@ -57,12 +64,23 @@ export default function WaterWatch({ isDarkMode, cityInfo, _liveWeather }) {
     gradeColor = '#ef4444';
   }
 
+  const districts = ['Ward A (South)', 'Ward B (Central)', 'Ward C (West)', 'Ward D (East)', 'Ward E (North)'];
+  const baseSupplied = [120, 145, 110, 160, 95];
+  const baseConsumed = [98, 118, 92, 126, 78];
+
+  const dynamicLeakages = districts.map((ward, idx) => {
+    const baseLeak = baseSupplied[idx] - baseConsumed[idx];
+    const press = wardPressures[ward] || 100;
+    return Math.round((baseLeak * Math.pow(press / 100, 2)) * 10) / 10;
+  });
+
+  const baseTotalLeakage = baseSupplied.reduce((acc, s, idx) => acc + (s - baseConsumed[idx]), 0);
+  const currentTotalLeakage = dynamicLeakages.reduce((acc, l) => acc + l, 0);
+  const dailyMldSaved = Math.max(0, Math.round((baseTotalLeakage - currentTotalLeakage) * 10) / 10);
+  const dailyFinancialSavings = Math.round(dailyMldSaved * 22000);
+
   const getDistrictChartOption = () => {
-    const districts = ['Ward A (South)', 'Ward B (Central)', 'Ward C (West)', 'Ward D (East)', 'Ward E (North)'];
-    // Water Supplied vs Consumed vs Estimated Leakage
-    const supplied = [120, 145, 110, 160, 95];
     const consumed = [98, 118, 92, 126, 78];
-    const leakage = supplied.map((s, idx) => s - consumed[idx]);
 
     return {
       backgroundColor: 'transparent',
@@ -73,7 +91,7 @@ export default function WaterWatch({ isDarkMode, cityInfo, _liveWeather }) {
       yAxis: { type: 'category', data: districts, axisLine: { lineStyle: { color: border } }, axisLabel: { color: muted, fontSize: 9 } },
       series: [
         { name: 'Billed Consumption', type: 'bar', stack: 'total', itemStyle: { color: '#0ea5e9' }, data: consumed },
-        { name: 'Leakage Loss', type: 'bar', stack: 'total', itemStyle: { color: '#ef4444' }, data: leakage }
+        { name: 'Leakage Loss', type: 'bar', stack: 'total', itemStyle: { color: '#ef4444' }, data: dynamicLeakages }
       ]
     };
   };
@@ -296,15 +314,99 @@ export default function WaterWatch({ isDarkMode, cityInfo, _liveWeather }) {
         </div>
       </div>
 
-      {/* Leakage Loss Chart */}
-      <div className="card">
-        <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
-          <h3 className="card-title"><BarChart2 className="w-4 h-4 text-sky-500" /> District Water Loss &amp; Non-Revenue Water Breakdown</h3>
-          <span className="card-subtitle">Comparing billable metered consumption vs unmetered transport leakage losses by municipal ward</span>
+      {/* Leakage Loss Chart & Valve Optimizer Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        
+        {/* Left Column: ECharts */}
+        <div className="card xl:col-span-2">
+          <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+            <h3 className="card-title"><BarChart2 className="w-4 h-4 text-sky-500" /> District Water Loss &amp; Non-Revenue Water</h3>
+            <span className="card-subtitle">Comparing billable metered consumption vs unmetered transport leakage losses by municipal ward</span>
+          </div>
+          <div className="h-[260px] mt-4">
+            <ReactECharts option={getDistrictChartOption()} style={{ height: '100%', width: '100%' }} />
+          </div>
         </div>
-        <div className="h-[250px] mt-4">
-          <ReactECharts option={getDistrictChartOption()} style={{ height: '100%', width: '105%' }} />
+
+        {/* Right Column: Valve Optimizer Panel */}
+        <div className="card flex flex-col justify-between">
+          <div>
+            <div className="card-header border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+              <h3 className="card-title">⚙️ Municipal Valve Control</h3>
+              <span className="card-subtitle">Regulate pressure segments to reduce pipe leakage loss</span>
+            </div>
+
+            <div className="flex flex-col gap-3.5 mt-2">
+              {districts.map((ward, idx) => {
+                const currentLeak = dynamicLeakages[idx];
+                const pressure = wardPressures[ward] || 100;
+                
+                return (
+                  <div key={ward} className="text-xs">
+                    <div className="flex justify-between items-center mb-1 font-semibold">
+                      <span className="text-slate-800 dark:text-slate-205">{ward.replace(' (South)', '').replace(' (Central)', '').replace(' (West)', '').replace(' (East)', '').replace(' (North)', '')}</span>
+                      <div className="flex gap-2">
+                        <span className="text-[10px] text-slate-400 font-mono">Press: {pressure}%</span>
+                        <span className={`text-[10px] font-bold font-mono ${currentLeak > 20 ? 'text-red-500' : currentLeak > 10 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                          {currentLeak} MLD
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <input 
+                      type="range"
+                      min="50"
+                      max="100"
+                      value={pressure}
+                      onChange={(e) => {
+                        const newPress = parseInt(e.target.value);
+                        setWardPressures(prev => {
+                          const updated = { ...prev, [ward]: newPress };
+                          const logMsg = `[Water Authority] Calibrated pressure valve in ${ward} to ${newPress}%. Est. leakage rate: ${currentLeak} MLD.`;
+                          window.dispatchEvent(new CustomEvent('civicmind_log', { detail: logMsg }));
+                          return updated;
+                        });
+                      }}
+                      className="w-full accent-sky-500 h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-150 dark:border-slate-800 flex flex-col gap-3">
+            <div className="bg-sky-500/5 border border-sky-500/10 p-3 rounded-xl flex items-center justify-between">
+              <div>
+                <span className="text-[9px] text-slate-400 block font-mono">DAILY WATER SAVED</span>
+                <span className="text-xs font-black text-sky-500 font-mono">+{dailyMldSaved} MLD</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[9px] text-slate-400 block font-mono">FINANCIAL SAVED</span>
+                <span className="text-xs font-black text-emerald-505 font-mono">₹{dailyFinancialSavings.toLocaleString()} / day</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                const optimal = {
+                  'Ward A (South)': 75,
+                  'Ward B (Central)': 80,
+                  'Ward C (West)': 70,
+                  'Ward D (East)': 75,
+                  'Ward E (North)': 80
+                };
+                setWardPressures(optimal);
+                const logMsg = `[Water Authority] Executed grid-wide valve Auto-Calibration. Net leakage saved: 23 MLD.`;
+                window.dispatchEvent(new CustomEvent('civicmind_log', { detail: logMsg }));
+              }}
+              className="w-full py-2 bg-gradient-to-r from-sky-600 to-sky-700 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-lg shadow hover:from-sky-700 hover:to-sky-800 transition-all cursor-pointer text-center"
+            >
+              💧 Auto-Calibrate Grid Valves
+            </button>
+          </div>
         </div>
+
       </div>
       
     </div>
