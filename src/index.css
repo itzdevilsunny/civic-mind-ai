@@ -1459,5 +1459,25 @@ html.dark .landing-role-list li {
   transform: translateY(-1px);
 }
 
+/* Breaking Crisis Ticker Marquee */
+@keyframes marquee {
+  0% { transform: translateX(10%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-marquee {
+  display: inline-block;
+  animation: marquee 30s linear infinite;
+  padding-left: 20px;
+}
+
+/* Glassmorphic scale in */
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 
 

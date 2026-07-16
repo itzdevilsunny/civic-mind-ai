@@ -1,0 +1,9 @@
+civicmind.db
+civicmind.db-journal
+civicmind.db-shm
+civicmind.db-wal
+.venv
+backend/.venv
+node_modules
+dist
+.git

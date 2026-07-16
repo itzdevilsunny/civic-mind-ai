@@ -48,6 +48,7 @@ import AgentTimeline from './components/AgentTimeline';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import PublicSafety from './components/PublicSafety';
 import UrjaGrid from './components/UrjaGrid';
+import EmergencyMediaCenter from './components/EmergencyMediaCenter';
 import WaterWatch from './components/WaterWatch';
 import HealthWatch from './components/HealthWatch';
 import TransitEco from './components/TransitEco';
@@ -105,6 +106,8 @@ export default function App() {
   const [activeToast, setActiveToast] = useState(null);
   const [dispatchedEmergency, setDispatchedEmergency] = useState(null);
   const [autopilotEnabled, setAutopilotEnabled] = useState(false);
+  const [activeCrisis, setActiveCrisis] = useState(null);
+  const [isMediaCenterOpen, setIsMediaCenterOpen] = useState(false);
   
   // City & Language state
   const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem('civicmind_city') || 'mumbai');
@@ -524,6 +527,17 @@ export default function App() {
             `🤖 [Autopilot Actuator] Autonomous dispatch trigger ${action.id} generated for ticket ${evt.id}.`,
             ...prev
           ]);
+          if (evt.priority === 'High' || evt.priority === 'Critical') {
+            setActiveCrisis({
+              id: evt.id,
+              title: evt.title.replace("🤖 Autopilot: ", ""),
+              description: evt.description,
+              priority: evt.priority,
+              category: evt.category,
+              timestamp: Date.now(),
+              action: action
+            });
+          }
           loadLiveData();
         }
 
@@ -568,6 +582,16 @@ export default function App() {
               const utterance = new SpeechSynthesisUtterance(`Warning. New emergency alert. ${evt.title.replace(/[^\w\s]/g, '')}. ${evt.description}`);
               utterance.rate = 1.0;
               window.speechSynthesis.speak(utterance);
+            }
+            if (evt.priority === 'High' || evt.priority === 'Critical') {
+              setActiveCrisis({
+                id: evt.id,
+                title: evt.title.replace("🚨 ", ""),
+                description: evt.description,
+                priority: evt.priority,
+                category: evt.category,
+                timestamp: Date.now()
+              });
             }
 
             // 5. Add to system logs
@@ -2709,6 +2733,51 @@ export default function App() {
         sustainability={sustainability}
         liveTransport={liveTransport}
         onVoiceCommand={handleVoiceCommand}
+      />
+
+      {/* REAL-TIME CRISIS BROADCAST TICKER BAR */}
+      {activeCrisis && (
+        <div 
+          className="fixed bottom-0 left-0 right-0 z-[9990] bg-slate-950 border-t-2 border-red-600 text-red-500 py-3 px-4 shadow-[0_-5px_20px_rgba(220,38,38,0.15)] flex items-center justify-between gap-4 font-mono select-none"
+        >
+          <div className="flex items-center gap-3 overflow-hidden w-full">
+            <div className="flex items-center gap-1.5 shrink-0 bg-red-600 text-white font-extrabold text-[9px] uppercase tracking-wider px-2 py-0.5 rounded shadow-[0_0_8px_rgba(220,38,38,0.5)] animate-pulse">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Breaking Alert</span>
+            </div>
+            
+            {/* Marquee Ticker */}
+            <div className="w-full overflow-hidden text-xs font-semibold text-slate-300 flex items-center">
+              <div className="animate-marquee whitespace-nowrap">
+                <span>⚠️ CRITICAL CITY DISTRICT BULLETIN: [ID: {activeCrisis.id}] {activeCrisis.title.toUpperCase()} — {activeCrisis.description.toUpperCase()} — ACTIVE COORDINATION LOGGED — DISPATCH ASSETS MOBILIZED — CITIZENS RESIDING IN {cityInfo.label.toUpperCase()} ADVISE UTMOST CAUTION — </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsMediaCenterOpen(true)}
+              className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white font-extrabold text-[9px] uppercase tracking-wide transition-all shadow-[0_0_10px_rgba(220,38,38,0.3)] cursor-pointer"
+            >
+              Media Center
+            </button>
+            <button
+              onClick={() => setActiveCrisis(null)}
+              className="p-1 rounded text-slate-500 hover:bg-slate-900 transition-colors cursor-pointer"
+              title="Dismiss Ticker"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Media Center Modal */}
+      <EmergencyMediaCenter 
+        isOpen={isMediaCenterOpen}
+        onClose={() => setIsMediaCenterOpen(false)}
+        crisis={activeCrisis}
+        actions={actionHistory}
       />
 
       {/* Real-time Emergency Toast */}
