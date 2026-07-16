@@ -51,7 +51,7 @@ else:
     logger.warning("Gemini API key not configured. Running in Mock AI mode.")
 
 # --- Database Wrapper Engine (Supabase + SQLite Fallback) ---
-SQLITE_PATH = os.path.join(os.path.dirname(__file__), "civicmind.db")
+SQLITE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "civicmind.db"))
 USE_SUPABASE = False
 
 def init_db():
@@ -86,11 +86,11 @@ def init_db():
             submitted_at TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
             image TEXT
         );
+        """)
         cursor.execute("PRAGMA table_info(tickets)")
         columns = [col[1] for col in cursor.fetchall()]
         if "image" not in columns:
             cursor.execute("ALTER TABLE tickets ADD COLUMN image TEXT")
-        """)
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS telemetry_logs (
             id TEXT PRIMARY KEY,
