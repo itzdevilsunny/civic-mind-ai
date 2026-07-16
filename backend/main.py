@@ -451,6 +451,9 @@ class ComplaintSubmit(BaseModel):
 class ChatMessage(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
+    city: Optional[str] = "Mumbai"
+    lat: Optional[float] = 19.076
+    lng: Optional[float] = 72.8777
 
 class ActionExecute(BaseModel):
     action_name: str
@@ -2443,20 +2446,23 @@ async def chat_copilot(payload: ChatMessage, request: Request):
         yield json.dumps({"type": "THOUGHT", "content": f"Initiating decision intelligence copilot analyzer for query: '{user_message}'"})
         await asyncio.sleep(0.1)
 
-        # 1. Fetch live metrics as background context
+        # 1. Fetch live metrics as background context for the selected city
+        city_name = payload.city or "Mumbai"
+        lat = payload.lat or 19.076
+        lng = payload.lng or 72.8777
         try:
-            weather = get_live_weather()
+            weather = get_live_weather(lat, lng)
         except Exception as e:
             weather = f"Unavailable: {e}"
 
         try:
-            aqi = get_live_aqi()
+            aqi = get_live_aqi(lat, lng)
         except Exception as e:
             aqi = f"Unavailable: {e}"
 
         try:
-            transport = get_live_transport()
-            transport_summary = ", ".join([f"{t['name']}: {t['lineStatuses'][0]['statusSeverityDescription']}" for t in transport[:8]])
+            transport = get_live_transport(city_name, lat, lng)
+            transport_summary = ", ".join([f"{t['name']}: {t['lineStatuses'][0]['statusSeverityDescription']}" for t in transport[:8]]) if transport else "No active transit lines found."
         except Exception as e:
             transport_summary = f"Unavailable: {e}"
 
@@ -2480,16 +2486,16 @@ async def chat_copilot(payload: ChatMessage, request: Request):
 
         # 2. Assemble system background prompt
         system_prompt = f"""
-        You are the CivicMind AI London Decision Intelligence Copilot.
+        You are the CivicMind AI {city_name} Decision Intelligence Copilot.
         You assist city administrators in analyzing real-time urban telemetry, verifying citizen complaints, and coordinating dispatches of maintenance resources.
         
-        Current London Central Weather:
+        Current {city_name} Weather:
         {weather}
         
-        Current London Air Quality:
+        Current {city_name} Air Quality:
         {aqi}
         
-        Current TfL Tube Lines Statuses:
+        Current {city_name} Transit Statuses (OSM relations):
         {transport_summary}
         
         Current Active Citizen Complaint Tickets (Database):
@@ -2501,7 +2507,7 @@ async def chat_copilot(payload: ChatMessage, request: Request):
         Recent Dispatch Actions History:
         {actions_summary}
         
-        Analyze the user's message and explain findings clearly. Focus on actual issues shown in the database or live feeds.
+        Analyze the user's message and explain findings clearly. Focus on actual issues shown in the database or live feeds for {city_name}.
         Always suggest dispatches or concrete actionable decisions (with estimated impact) if the city telemetry shows anomalies or if the user asks for resolutions.
         
         You must output your response in multiple parts, using tags:
@@ -4014,6 +4020,9 @@ Provide exactly 3 operational actions. Only return JSON. No markdown wrappers.""
 
 class CopilotQuery(BaseModel):
     text: str
+    city: Optional[str] = "Mumbai"
+    lat: Optional[float] = 19.076
+    lng: Optional[float] = 72.8777
 
 @app.post("/api/copilot/process")
 def process_copilot_complaint(query: CopilotQuery):
@@ -4021,28 +4030,29 @@ def process_copilot_complaint(query: CopilotQuery):
     Triage and extract ticket attributes from raw citizen text using Gemini AI.
     """
     text = query.text
-    prompt = f"""You are the CivicMind AI triage operator. Analyze the citizen complaint description:
+    city = query.city or "Mumbai"
+    prompt = f"""You are the CivicMind AI triage operator for the city of {city}. Analyze the citizen complaint description:
 "{text}"
-
+"""
+    # Rest of prompt...
+    prompt_rules = """
 Extract the ticket parameters as JSON:
-{{
+{
   "title": "Short descriptive title (max 50 chars)",
   "category": "Roads & Bridges|Utilities & Lighting|Public Safety|Environmental|Transport|Social Services",
   "priority": "Low|Medium|High|Critical",
   "description": "Cleaned up detailed summary of the issue"
-}}
+}
 
 Rules:
 - Select Category exactly from the choices.
 - Select Priority based on severity (e.g. active fires/water floods = Critical/High, simple street light out = Medium, gardening = Low).
 - Only return JSON. No markdown backticks or formatting. Just raw JSON."""
+    prompt = prompt + prompt_rules
 
-    if gemini_available:
+    if gemini_available and gemini_model:
         try:
-            model = genai.GenerativeModel("generative-model" if "generative-model" in str(genai.list_models) else "gemini-2.5-flash")
-            if "gemini-2.5-flash" not in [m.name for m in genai.list_models() if "generateContent" in m.supported_generation_methods]:
-                model = genai.GenerativeModel("gemini-2.5-flash")
-            response = model.generate_content(prompt)
+            response = gemini_model.generate_content(prompt)
             raw = response.text.strip()
             if raw.startswith("```"):
                 raw = raw.split("```")[1]

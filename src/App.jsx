@@ -724,7 +724,12 @@ export default function App() {
       const res = await fetch('/api/copilot/process', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: userText })
+        body: JSON.stringify({ 
+          text: userText,
+          city: cityInfo.label,
+          lat: cityInfo.lat,
+          lng: cityInfo.lng
+        })
       });
       if (!res.ok) throw new Error('API Error');
       const parsed = await res.json();
@@ -2232,7 +2237,13 @@ export default function App() {
 
               {/* Multi-agent status */}
               <section>
-                <MultiAgentStatus logsList={systemLogs} />
+                <MultiAgentStatus 
+                  logsList={systemLogs} 
+                  telemetry={telemetry} 
+                  liveWeather={liveWeather} 
+                  liveAqi={liveAqi} 
+                  cityLabel={cityInfo?.label} 
+                />
               </section>
 
               {/* Active tickets workflow tracker */}
